@@ -5,160 +5,405 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta
       name="description"
-      content="Setu: private remittances on Stellar with selective disclosure receipts."
+      content="Setu is a private remittance app on Stellar with ZK withdrawal proofs and selective disclosure receipts."
     />
     <title>Setu - Private Remittances on Stellar</title>
     <link
       rel="icon"
-      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%2307100f'/%3E%3Cpath d='M14 39c12-18 24-18 36 0' fill='none' stroke='%2347dec2' stroke-width='6' stroke-linecap='round'/%3E%3Ccircle cx='18' cy='40' r='5' fill='%23f0c766'/%3E%3Ccircle cx='46' cy='40' r='5' fill='%2347dec2'/%3E%3C/svg%3E"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%230b1412'/%3E%3Cpath d='M14 39c12-18 24-18 36 0' fill='none' stroke='%234fc3b1' stroke-width='6' stroke-linecap='round'/%3E%3Ccircle cx='18' cy='40' r='5' fill='%23f2c14e'/%3E%3Ccircle cx='46' cy='40' r='5' fill='%234fc3b1'/%3E%3C/svg%3E"
     />
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
-    <canvas id="rail-map" aria-hidden="true"></canvas>
-    <main class="shell">
-      <header class="topbar">
-        <div>
-          <p class="eyebrow">Stellar Real-World ZK</p>
-          <h1>Setu</h1>
-        </div>
-        <a
-          class="icon-link"
-          href="https://lab.stellar.org/r/testnet/contract/CDXLQFYQJVDXBZDI5QVYRAM5TGPMZQWS424FCQWYVNGSKSSHPU6XXAXT"
-          target="_blank"
-          rel="noreferrer"
-          aria-label="Open live contract"
-          title="Open live contract"
-        >
-          Live contract
+    <main class="app-shell">
+      <aside class="sidebar" aria-label="Setu navigation">
+        <a class="brand" href="#overview" aria-label="Setu home">
+          <span class="brand-mark" aria-hidden="true">S</span>
+          <span>
+            <strong>Setu</strong>
+            <small>Stellar private remittance</small>
+          </span>
         </a>
-      </header>
 
-      <section class="status-grid" aria-label="Live status">
-        <article class="status-panel primary">
-          <p class="eyebrow">Live testnet contract</p>
-          <code>CDXLQFYQJVDXBZDI5QVYRAM5TGPMZQWS424FCQWYVNGSKSSHPU6XXAXT</code>
-          <div class="signal-row">
-            <span class="signal ok"></span>
-            <span>Patched contract deployed and verified on testnet</span>
-          </div>
-        </article>
-        <article class="status-panel">
-          <span class="metric">true</span>
-          <p>Valid disclosure receipt accepted by `verify_disclosure`.</p>
-        </article>
-        <article class="status-panel">
-          <span class="metric">false</span>
-          <p>Tampered receipt rejected by the same contract call.</p>
-        </article>
-      </section>
+        <nav class="side-nav" aria-label="Primary">
+          <button class="nav-item active" data-view="overview" onclick="setView('overview')">Overview</button>
+          <button class="nav-item" data-view="send" onclick="setView('send')">Send</button>
+          <button class="nav-item" data-view="receive" onclick="setView('receive')">Receive</button>
+          <button class="nav-item" data-view="receipts" onclick="setView('receipts')">Receipts</button>
+          <button class="nav-item" data-view="contract" onclick="setView('contract')">Contract</button>
+        </nav>
 
-      <nav class="tabs" aria-label="Submission sections">
-        <button class="tab active" data-tab="flow">Live Flow</button>
-        <button class="tab" data-tab="proof">Proof Signals</button>
-        <button class="tab" data-tab="security">Security</button>
-        <button class="tab" data-tab="run">Runbook</button>
-      </nav>
+        <section class="identity-panel" aria-label="Demo profile">
+          <p class="eyebrow">Signed in as</p>
+          <strong id="profile-name">Guest account</strong>
+          <span id="profile-email">guest@setu.demo</span>
+          <button class="secondary full-width" id="wallet-button" type="button">
+            Connect wallet
+          </button>
+        </section>
+      </aside>
 
-      <section class="panel active" id="flow">
-        <div class="section-head">
-          <h2>What Works</h2>
-          <p>
-            A fresh patched deployment completed deposit, association-root
-            update, private withdrawal, disclosure VK install, valid receipt
-            verification, and tampered receipt rejection.
-          </p>
-        </div>
-        <div class="flow">
-          <a href="https://stellar.expert/explorer/testnet/tx/c9c8ed3e1f6b988b76b29526967195aec4b135dc4bc29ad6fabde0073f701b51" target="_blank" rel="noreferrer">WASM uploaded</a>
-          <a href="https://stellar.expert/explorer/testnet/tx/3b9a86af7273750b54324c96fb3129a7677f59b7eb288b3c5de6dfe60abb019a" target="_blank" rel="noreferrer">Contract deployed</a>
-          <a href="https://stellar.expert/explorer/testnet/tx/adf901702fea3fcd09e0b8a94d19388d23d7579d05cbe8f7210b30489f9eb458" target="_blank" rel="noreferrer">Deposit</a>
-          <a href="https://stellar.expert/explorer/testnet/tx/709cf0d7530259e33b0af6ba0aa46d811947b1aa71a33f66042e275dfaafa938" target="_blank" rel="noreferrer">Association root</a>
-          <a href="https://stellar.expert/explorer/testnet/tx/6d19b21f5f96ac4237ce85882c81c9d991cd88cfb4859fd59c359b28463cfb9a" target="_blank" rel="noreferrer">Private withdraw</a>
-          <a href="https://stellar.expert/explorer/testnet/tx/d35c95b0c65ddaedee2b85cd52a5d248571abb36d56c42c3599235ef8d64c6e0" target="_blank" rel="noreferrer">Disclosure VK</a>
-        </div>
-      </section>
-
-      <section class="panel" id="proof">
-        <div class="section-head">
-          <h2>Receipt Proof</h2>
-          <p>
-            The withdrawal nullifier in both public-signal arrays matches. The
-            receipt links a spent nullifier to a real deposited commitment and a
-            disclosed amount.
-          </p>
-        </div>
-        <div class="code-grid">
+      <section class="workspace">
+        <header class="topbar">
           <div>
-            <h3>Withdrawal public signals</h3>
-            <pre><code>[
-  "33832171054643436472546998686772011210227251098487950275135154568712175384598",
-  "1000000000",
-  "30162851960749159054107963444341137279716337900493764726816877893946218126682",
-  "30671046209969431012473152916297518771579159592633900587133061089753651787613"
-]</code></pre>
+            <p class="eyebrow">Live testnet prototype</p>
+            <h1>Private remittance desk</h1>
           </div>
-          <div>
-            <h3>Disclosure public signals</h3>
-            <pre><code>[
+          <div class="top-actions">
+            <a
+              class="secondary"
+              href="https://github.com/Flamki/setu-stellar-zk"
+              target="_blank"
+              rel="noreferrer"
+            >
+              GitHub
+            </a>
+            <button class="secondary" id="signin-open" onclick="openAuth('login')" type="button">Log in</button>
+            <button class="primary" id="signup-open" onclick="openAuth('signup')" type="button">Sign up</button>
+          </div>
+        </header>
+
+        <section class="view active" id="overview">
+          <div class="hero-grid">
+            <div class="hero-copy">
+              <p class="eyebrow">USD to INR corridor</p>
+              <h2>Send privately. Prove only what compliance needs.</h2>
+              <p>
+                Alice deposits a fixed-value note, Bob withdraws with a ZK proof,
+                and an auditor can verify a selective-disclosure receipt tied to
+                the spent nullifier.
+              </p>
+              <div class="hero-actions">
+                <button class="primary" data-view-link="send" onclick="setView('send')" type="button">New transfer</button>
+                <button class="secondary" data-view-link="receipts" onclick="setView('receipts')" type="button">Open receipts</button>
+              </div>
+            </div>
+            <figure class="product-shot">
+              <img src="./assets/setu-product.png" alt="Setu remittance dashboard preview" />
+            </figure>
+          </div>
+
+          <div class="metrics-row" aria-label="Account summary">
+            <article class="metric-card">
+              <span>Pool liquidity</span>
+              <strong>1,000 XLM</strong>
+              <small>Fresh testnet deposit confirmed</small>
+            </article>
+            <article class="metric-card">
+              <span>Proof status</span>
+              <strong class="status-good">Verified</strong>
+              <small>Valid disclosure accepted on-chain</small>
+            </article>
+            <article class="metric-card">
+              <span>Privacy set</span>
+              <strong>Association root</strong>
+              <small>Root update tx recorded</small>
+            </article>
+            <article class="metric-card">
+              <span>Tamper check</span>
+              <strong class="status-bad">Rejected</strong>
+              <small>Altered public signals fail</small>
+            </article>
+          </div>
+
+          <section class="split-grid">
+            <div class="panel">
+              <div class="section-head">
+                <h2>Transfer activity</h2>
+                <a
+                  href="https://stellar.expert/explorer/testnet/tx/6d19b21f5f96ac4237ce85882c81c9d991cd88cfb4859fd59c359b28463cfb9a"
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  Withdrawal tx
+                </a>
+              </div>
+              <div class="activity-list" id="activity-list"></div>
+            </div>
+
+            <div class="panel">
+              <div class="section-head">
+                <h2>Recipient payout</h2>
+                <span class="pill">Ready</span>
+              </div>
+              <div class="payout-card">
+                <div>
+                  <span>Recipient</span>
+                  <strong>Bob INR wallet</strong>
+                </div>
+                <div>
+                  <span>Amount</span>
+                  <strong>1,000 XLM</strong>
+                </div>
+                <div>
+                  <span>Receipt</span>
+                  <strong>Selective disclosure</strong>
+                </div>
+              </div>
+              <button class="primary full-width" data-view-link="receive" onclick="setView('receive')" type="button">
+                Review withdrawal
+              </button>
+            </div>
+          </section>
+        </section>
+
+        <section class="view" id="send">
+          <div class="section-head wide">
+            <div>
+              <p class="eyebrow">Sender flow</p>
+              <h2>Create a private transfer</h2>
+            </div>
+            <span class="pill">Demo note generated</span>
+          </div>
+
+          <div class="transfer-layout">
+            <form class="panel form-panel" id="send-form">
+              <label>
+                From
+                <input name="from" value="Alice USD account" />
+              </label>
+              <label>
+                Recipient
+                <input name="recipient" value="Bob INR wallet" />
+              </label>
+              <label>
+                Amount
+                <div class="amount-row">
+                  <input name="amount" type="number" min="1" value="1000" />
+                  <select name="asset" aria-label="Asset">
+                    <option>XLM</option>
+                    <option>USDC</option>
+                  </select>
+                </div>
+              </label>
+              <label>
+                Purpose
+                <select name="purpose">
+                  <option>Family support</option>
+                  <option>Education</option>
+                  <option>Medical</option>
+                  <option>Business invoice</option>
+                </select>
+              </label>
+              <label>
+                Privacy note
+                <textarea name="memo">Fresh note opens a commitment already proven on Stellar testnet.</textarea>
+              </label>
+              <button class="primary full-width" type="submit">Generate private transfer</button>
+            </form>
+
+            <div class="panel proof-panel">
+              <div class="section-head">
+                <h2>Proof package</h2>
+                <span class="pill" id="proof-pill">Ready</span>
+              </div>
+              <div class="proof-steps">
+                <div class="step done">
+                  <strong>Deposit note</strong>
+                  <span>Commitment stored in pool</span>
+                </div>
+                <div class="step done">
+                  <strong>Association root</strong>
+                  <span>Root accepted by contract admin</span>
+                </div>
+                <div class="step active" id="withdraw-step">
+                  <strong>Withdrawal proof</strong>
+                  <span id="withdraw-copy">Fresh Groth16 proof verified</span>
+                </div>
+                <div class="step" id="receipt-step">
+                  <strong>Disclosure receipt</strong>
+                  <span>Auditor proof package available</span>
+                </div>
+              </div>
+              <pre><code id="proof-json">{
+  "contract": "CDXLQFYQJVDXBZDI5QVYRAM5TGPMZQWS424FCQWYVNGSKSSHPU6XXAXT",
+  "nullifier": "4acc5489ab80200caae1eca0b44dd2335e92931ff51e358e4fc7381378367816",
+  "disclosure": true
+}</code></pre>
+            </div>
+          </div>
+        </section>
+
+        <section class="view" id="receive">
+          <div class="section-head wide">
+            <div>
+              <p class="eyebrow">Recipient flow</p>
+              <h2>Withdraw to a recipient wallet</h2>
+            </div>
+            <a
+              class="secondary"
+              href="https://stellar.expert/explorer/testnet/tx/6d19b21f5f96ac4237ce85882c81c9d991cd88cfb4859fd59c359b28463cfb9a"
+              target="_blank"
+              rel="noreferrer"
+            >
+              Open tx
+            </a>
+          </div>
+
+          <div class="split-grid">
+            <div class="panel">
+              <h2>Withdrawal ticket</h2>
+              <div class="ticket">
+                <div>
+                  <span>Claim code</span>
+                  <strong>SETU-86-FRESH</strong>
+                </div>
+                <div>
+                  <span>Asset</span>
+                  <strong>1,000 XLM</strong>
+                </div>
+                <div>
+                  <span>Destination</span>
+                  <strong>Bob INR wallet</strong>
+                </div>
+                <div>
+                  <span>Status</span>
+                  <strong class="status-good">Withdrawn</strong>
+                </div>
+              </div>
+              <button class="primary full-width" id="withdraw-button" type="button">
+                Recheck withdrawal status
+              </button>
+            </div>
+
+            <div class="panel">
+              <h2>Privacy checks</h2>
+              <div class="check-list">
+                <span>Spent nullifier exists on-chain</span>
+                <span>Merkle root matched pool root</span>
+                <span>Association root matched admin root</span>
+                <span>Duplicate withdrawal blocked</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="view" id="receipts">
+          <div class="section-head wide">
+            <div>
+              <p class="eyebrow">Auditor flow</p>
+              <h2>Selective-disclosure receipt</h2>
+            </div>
+            <button class="primary" id="copy-receipt" type="button">Copy receipt</button>
+          </div>
+
+          <div class="receipt-layout">
+            <div class="panel receipt-card">
+              <div class="receipt-header">
+                <div>
+                  <span>Receipt ID</span>
+                  <strong>SETU-DISC-001</strong>
+                </div>
+                <span class="pill">Verified true</span>
+              </div>
+              <dl>
+                <div>
+                  <dt>Disclosed amount</dt>
+                  <dd>1,000 XLM</dd>
+                </div>
+                <div>
+                  <dt>Purpose</dt>
+                  <dd>Family support</dd>
+                </div>
+                <div>
+                  <dt>Recipient tag</dt>
+                  <dd>Bob INR wallet</dd>
+                </div>
+                <div>
+                  <dt>Auditor tag</dt>
+                  <dd>Poseidon(viewingKey, nullifierHash)</dd>
+                </div>
+              </dl>
+            </div>
+
+            <div class="panel">
+              <div class="section-head">
+                <h2>Public signals</h2>
+                <span class="pill">Tamper false</span>
+              </div>
+              <pre><code>[
   "33832171054643436472546998686772011210227251098487950275135154568712175384598",
   "792451850146572312119437015092516461585820411321474856545290648487812800938",
   "13601723215849916214344531109121559986847487952922840288412049033564696840611",
   "49445820628079692271178516198415444927595013704302380125940463497865958044604"
 ]</code></pre>
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
 
-      <section class="panel" id="security">
-        <div class="section-head">
-          <h2>Audit Response</h2>
-          <p>
-            The submission is honest about v1 limits and includes a real fix for
-            the public-signal canonicalization issue found during review.
-          </p>
-        </div>
-        <div class="cards">
-          <article>
-            <h3>Fixed</h3>
-            <p>
-              Public signals now reject malformed bytes and non-canonical
-              BLS12-381 scalar encodings before nullifier or root comparisons.
-            </p>
-          </article>
-          <article>
-            <h3>Scoped</h3>
-            <p>
-              `recipientId` and `purpose` are prover-asserted context in v1.
-              The amount is the committed value; production should bind context
-              at deposit or through a signed off-ramp record.
-            </p>
-          </article>
-          <article>
-            <h3>Tested</h3>
-            <p>
-              The workspace test suite covers malformed proofs, truncated
-              public signals, non-canonical public signals, and disclosure
-              verifier negative cases.
-            </p>
-          </article>
-        </div>
-      </section>
+        <section class="view" id="contract">
+          <div class="section-head wide">
+            <div>
+              <p class="eyebrow">Live contract</p>
+              <h2>Stellar testnet evidence</h2>
+            </div>
+            <a
+              class="primary"
+              href="https://lab.stellar.org/r/testnet/contract/CDXLQFYQJVDXBZDI5QVYRAM5TGPMZQWS424FCQWYVNGSKSSHPU6XXAXT"
+              target="_blank"
+              rel="noreferrer"
+            >
+              Open contract
+            </a>
+          </div>
 
-      <section class="panel" id="run">
-        <div class="section-head">
-          <h2>Run It</h2>
-          <p>
-            The repository includes a reproducible PowerShell script for the
-            patched testnet path.
-          </p>
-        </div>
-        <pre><code>cd C:\Users\bbook\Desktop\zk\fork
-cargo test
-cargo build --target wasm32v1-none --release -p privacy-pools
-.\scripts\live_testnet_e2e.ps1</code></pre>
+          <div class="contract-grid">
+            <article class="panel contract-card">
+              <span>Contract ID</span>
+              <code>CDXLQFYQJVDXBZDI5QVYRAM5TGPMZQWS424FCQWYVNGSKSSHPU6XXAXT</code>
+            </article>
+            <article class="panel contract-card">
+              <span>Valid receipt</span>
+              <strong class="status-good">verify_disclosure = true</strong>
+            </article>
+            <article class="panel contract-card">
+              <span>Tampered receipt</span>
+              <strong class="status-bad">verify_disclosure = false</strong>
+            </article>
+          </div>
+
+          <div class="panel">
+            <div class="section-head">
+              <h2>Transaction trail</h2>
+              <span class="pill">Fresh deployment</span>
+            </div>
+            <div class="tx-list">
+              <a href="https://stellar.expert/explorer/testnet/tx/c9c8ed3e1f6b988b76b29526967195aec4b135dc4bc29ad6fabde0073f701b51" target="_blank" rel="noreferrer">WASM upload</a>
+              <a href="https://stellar.expert/explorer/testnet/tx/3b9a86af7273750b54324c96fb3129a7677f59b7eb288b3c5de6dfe60abb019a" target="_blank" rel="noreferrer">Contract deploy</a>
+              <a href="https://stellar.expert/explorer/testnet/tx/adf901702fea3fcd09e0b8a94d19388d23d7579d05cbe8f7210b30489f9eb458" target="_blank" rel="noreferrer">Deposit</a>
+              <a href="https://stellar.expert/explorer/testnet/tx/709cf0d7530259e33b0af6ba0aa46d811947b1aa71a33f66042e275dfaafa938" target="_blank" rel="noreferrer">Association root</a>
+              <a href="https://stellar.expert/explorer/testnet/tx/6d19b21f5f96ac4237ce85882c81c9d991cd88cfb4859fd59c359b28463cfb9a" target="_blank" rel="noreferrer">Private withdrawal</a>
+              <a href="https://stellar.expert/explorer/testnet/tx/d35c95b0c65ddaedee2b85cd52a5d248571abb36d56c42c3599235ef8d64c6e0" target="_blank" rel="noreferrer">Disclosure VK</a>
+            </div>
+          </div>
+        </section>
       </section>
     </main>
+
+    <div class="modal-backdrop" id="auth-modal" hidden>
+      <section class="modal" role="dialog" aria-modal="true" aria-labelledby="auth-title">
+        <button class="modal-close" id="auth-close" type="button" aria-label="Close">x</button>
+        <p class="eyebrow" id="auth-mode">Demo access</p>
+        <h2 id="auth-title">Create your Setu account</h2>
+        <form id="auth-form">
+          <label>
+            Name
+            <input name="name" value="Alice Mehta" />
+          </label>
+          <label>
+            Email
+            <input name="email" type="email" value="alice@setu.demo" />
+          </label>
+          <label>
+            Password
+            <input name="password" type="password" value="password" />
+          </label>
+          <button class="primary full-width" id="auth-submit" type="submit">Sign up</button>
+        </form>
+      </section>
+    </div>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
     <script src="./app.js"></script>
   </body>
 </html>

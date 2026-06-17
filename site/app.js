@@ -1,74 +1,159 @@
-const tabs = document.querySelectorAll(".tab");
-const panels = document.querySelectorAll(".panel");
+const views = document.querySelectorAll(".view");
+const navItems = document.querySelectorAll("[data-view]");
+const viewLinks = document.querySelectorAll("[data-view-link]");
+const toast = document.getElementById("toast");
+const authModal = document.getElementById("auth-modal");
+const authMode = document.getElementById("auth-mode");
+const authTitle = document.getElementById("auth-title");
+const authSubmit = document.getElementById("auth-submit");
+const profileName = document.getElementById("profile-name");
+const profileEmail = document.getElementById("profile-email");
+const activityList = document.getElementById("activity-list");
 
-tabs.forEach((tab) => {
-  tab.addEventListener("click", () => {
-    tabs.forEach((item) => item.classList.remove("active"));
-    panels.forEach((panel) => panel.classList.remove("active"));
-    tab.classList.add("active");
-    document.getElementById(tab.dataset.tab).classList.add("active");
-  });
-});
-
-const canvas = document.getElementById("rail-map");
-const ctx = canvas.getContext("2d");
-const nodes = [
-  { x: 0.12, y: 0.32, r: 4, label: "USD" },
-  { x: 0.28, y: 0.22, r: 3, label: "Pool" },
-  { x: 0.48, y: 0.38, r: 5, label: "ZK" },
-  { x: 0.68, y: 0.28, r: 3, label: "Audit" },
-  { x: 0.86, y: 0.48, r: 4, label: "INR" },
-  { x: 0.34, y: 0.72, r: 3, label: "Root" },
-  { x: 0.62, y: 0.72, r: 3, label: "Receipt" },
+const activities = [
+  {
+    title: "Private withdrawal completed",
+    detail: "Nullifier stored on Stellar testnet",
+    amount: "1,000 XLM",
+  },
+  {
+    title: "Disclosure receipt verified",
+    detail: "validProof returned true",
+    amount: "OK",
+  },
+  {
+    title: "Tampered receipt rejected",
+    detail: "altered public signals returned false",
+    amount: "Blocked",
+  },
 ];
 
-function resize() {
-  const scale = window.devicePixelRatio || 1;
-  canvas.width = Math.floor(window.innerWidth * scale);
-  canvas.height = Math.floor(window.innerHeight * scale);
-  canvas.style.width = `${window.innerWidth}px`;
-  canvas.style.height = `${window.innerHeight}px`;
-  ctx.setTransform(scale, 0, 0, scale, 0, 0);
+function showToast(message) {
+  toast.textContent = message;
+  toast.classList.add("show");
+  window.clearTimeout(showToast.timer);
+  showToast.timer = window.setTimeout(() => toast.classList.remove("show"), 2600);
 }
 
-function draw(time) {
-  const w = window.innerWidth;
-  const h = window.innerHeight;
-  ctx.clearRect(0, 0, w, h);
-  ctx.lineWidth = 1;
+function setView(id) {
+  views.forEach((view) => view.classList.toggle("active", view.id === id));
+  navItems.forEach((item) => item.classList.toggle("active", item.dataset.view === id));
+  window.location.hash = id;
+}
 
-  for (let i = 0; i < nodes.length - 1; i++) {
-    const a = nodes[i];
-    const b = nodes[i + 1];
-    const ax = a.x * w;
-    const ay = a.y * h;
-    const bx = b.x * w;
-    const by = b.y * h;
-    const pulse = (Math.sin(time / 700 + i) + 1) / 2;
-    ctx.strokeStyle = `rgba(71, 222, 194, ${0.12 + pulse * 0.18})`;
-    ctx.beginPath();
-    ctx.moveTo(ax, ay);
-    ctx.bezierCurveTo((ax + bx) / 2, ay - 55, (ax + bx) / 2, by + 55, bx, by);
-    ctx.stroke();
-  }
+function openAuth(mode) {
+  const isLogin = mode === "login";
+  authMode.textContent = isLogin ? "Welcome back" : "Demo access";
+  authTitle.textContent = isLogin ? "Log in to Setu" : "Create your Setu account";
+  authSubmit.textContent = isLogin ? "Log in" : "Sign up";
+  authModal.hidden = false;
+}
 
-  nodes.forEach((node, index) => {
-    const x = node.x * w;
-    const y = node.y * h;
-    const pulse = (Math.sin(time / 600 + index * 0.7) + 1) / 2;
-    ctx.fillStyle = `rgba(71, 222, 194, ${0.18 + pulse * 0.18})`;
-    ctx.beginPath();
-    ctx.arc(x, y, node.r + 8 + pulse * 8, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = index === 3 ? "#f0c766" : "#47dec2";
-    ctx.beginPath();
-    ctx.arc(x, y, node.r, 0, Math.PI * 2);
-    ctx.fill();
+function closeAuth() {
+  authModal.hidden = true;
+}
+
+function renderActivities() {
+  activityList.innerHTML = activities
+    .map(
+      (item) => `
+        <div class="activity-item">
+          <div>
+            <strong>${item.title}</strong>
+            <span>${item.detail}</span>
+          </div>
+          <strong>${item.amount}</strong>
+        </div>
+      `,
+    )
+    .join("");
+}
+
+navItems.forEach((item) => {
+  item.addEventListener("click", () => setView(item.dataset.view));
+});
+
+viewLinks.forEach((link) => {
+  link.addEventListener("click", () => setView(link.dataset.viewLink));
+});
+
+document.getElementById("signin-open").addEventListener("click", () => openAuth("login"));
+document.getElementById("signup-open").addEventListener("click", () => openAuth("signup"));
+document.getElementById("auth-close").addEventListener("click", closeAuth);
+
+authModal.addEventListener("click", (event) => {
+  if (event.target === authModal) closeAuth();
+});
+
+document.getElementById("auth-form").addEventListener("submit", (event) => {
+  event.preventDefault();
+  const form = new FormData(event.currentTarget);
+  profileName.textContent = form.get("name") || "Setu user";
+  profileEmail.textContent = form.get("email") || "user@setu.demo";
+  closeAuth();
+  showToast("Demo account active");
+});
+
+document.getElementById("wallet-button").addEventListener("click", (event) => {
+  event.currentTarget.textContent = "Wallet connected";
+  showToast("Testnet wallet connected");
+});
+
+document.getElementById("send-form").addEventListener("submit", (event) => {
+  event.preventDefault();
+  const form = new FormData(event.currentTarget);
+  const amount = Number(form.get("amount") || 1000).toLocaleString("en-US");
+  const asset = form.get("asset") || "XLM";
+  document.getElementById("proof-pill").textContent = "Generated";
+  document.getElementById("withdraw-step").classList.add("done");
+  document.getElementById("receipt-step").classList.add("active");
+  document.getElementById("withdraw-copy").textContent = `${amount} ${asset} proof package ready`;
+  document.getElementById("proof-json").textContent = JSON.stringify(
+    {
+      contract: "CDXLQFYQJVDXBZDI5QVYRAM5TGPMZQWS424FCQWYVNGSKSSHPU6XXAXT",
+      recipient: form.get("recipient"),
+      amount: `${amount} ${asset}`,
+      purpose: form.get("purpose"),
+      withdrawalProof: "verified",
+      disclosureReceipt: "available",
+    },
+    null,
+    2,
+  );
+  activities.unshift({
+    title: "Private transfer generated",
+    detail: `${form.get("recipient")} · ${form.get("purpose")}`,
+    amount: `${amount} ${asset}`,
   });
+  renderActivities();
+  showToast("Private transfer generated");
+});
 
-  requestAnimationFrame(draw);
+document.getElementById("withdraw-button").addEventListener("click", () => {
+  showToast("Withdrawal is confirmed on Stellar testnet");
+});
+
+document.getElementById("copy-receipt").addEventListener("click", async () => {
+  const receipt = {
+    receiptId: "SETU-DISC-001",
+    amount: "1,000 XLM",
+    purpose: "Family support",
+    verifyDisclosure: true,
+    tamperCheck: false,
+    contract: "CDXLQFYQJVDXBZDI5QVYRAM5TGPMZQWS424FCQWYVNGSKSSHPU6XXAXT",
+  };
+
+  try {
+    await navigator.clipboard.writeText(JSON.stringify(receipt, null, 2));
+    showToast("Receipt copied");
+  } catch {
+    showToast("Receipt ready to copy");
+  }
+});
+
+renderActivities();
+
+const initialHash = window.location.hash.replace("#", "");
+if (initialHash && document.getElementById(initialHash)) {
+  setView(initialHash);
 }
-
-resize();
-window.addEventListener("resize", resize);
-requestAnimationFrame(draw);
