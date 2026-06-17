@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="Setu: private remittances on Stellar with selective disclosure receipts."
+    />
+    <title>Setu - Private Remittances on Stellar</title>
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%2307100f'/%3E%3Cpath d='M14 39c12-18 24-18 36 0' fill='none' stroke='%2347dec2' stroke-width='6' stroke-linecap='round'/%3E%3Ccircle cx='18' cy='40' r='5' fill='%23f0c766'/%3E%3Ccircle cx='46' cy='40' r='5' fill='%2347dec2'/%3E%3C/svg%3E"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <canvas id="rail-map" aria-hidden="true"></canvas>
+    <main class="shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Stellar Real-World ZK</p>
+          <h1>Setu</h1>
+        </div>
+        <a
+          class="icon-link"
+          href="https://lab.stellar.org/r/testnet/contract/CDXLQFYQJVDXBZDI5QVYRAM5TGPMZQWS424FCQWYVNGSKSSHPU6XXAXT"
+          target="_blank"
+          rel="noreferrer"
+          aria-label="Open live contract"
+          title="Open live contract"
+        >
+          Live contract
+        </a>
+      </header>
+
+      <section class="status-grid" aria-label="Live status">
+        <article class="status-panel primary">
+          <p class="eyebrow">Live testnet contract</p>
+          <code>CDXLQFYQJVDXBZDI5QVYRAM5TGPMZQWS424FCQWYVNGSKSSHPU6XXAXT</code>
+          <div class="signal-row">
+            <span class="signal ok"></span>
+            <span>Patched contract deployed and verified on testnet</span>
+          </div>
+        </article>
+        <article class="status-panel">
+          <span class="metric">true</span>
+          <p>Valid disclosure receipt accepted by `verify_disclosure`.</p>
+        </article>
+        <article class="status-panel">
+          <span class="metric">false</span>
+          <p>Tampered receipt rejected by the same contract call.</p>
+        </article>
+      </section>
+
+      <nav class="tabs" aria-label="Submission sections">
+        <button class="tab active" data-tab="flow">Live Flow</button>
+        <button class="tab" data-tab="proof">Proof Signals</button>
+        <button class="tab" data-tab="security">Security</button>
+        <button class="tab" data-tab="run">Runbook</button>
+      </nav>
+
+      <section class="panel active" id="flow">
+        <div class="section-head">
+          <h2>What Works</h2>
+          <p>
+            A fresh patched deployment completed deposit, association-root
+            update, private withdrawal, disclosure VK install, valid receipt
+            verification, and tampered receipt rejection.
+          </p>
+        </div>
+        <div class="flow">
+          <a href="https://stellar.expert/explorer/testnet/tx/c9c8ed3e1f6b988b76b29526967195aec4b135dc4bc29ad6fabde0073f701b51" target="_blank" rel="noreferrer">WASM uploaded</a>
+          <a href="https://stellar.expert/explorer/testnet/tx/3b9a86af7273750b54324c96fb3129a7677f59b7eb288b3c5de6dfe60abb019a" target="_blank" rel="noreferrer">Contract deployed</a>
+          <a href="https://stellar.expert/explorer/testnet/tx/adf901702fea3fcd09e0b8a94d19388d23d7579d05cbe8f7210b30489f9eb458" target="_blank" rel="noreferrer">Deposit</a>
+          <a href="https://stellar.expert/explorer/testnet/tx/709cf0d7530259e33b0af6ba0aa46d811947b1aa71a33f66042e275dfaafa938" target="_blank" rel="noreferrer">Association root</a>
+          <a href="https://stellar.expert/explorer/testnet/tx/6d19b21f5f96ac4237ce85882c81c9d991cd88cfb4859fd59c359b28463cfb9a" target="_blank" rel="noreferrer">Private withdraw</a>
+          <a href="https://stellar.expert/explorer/testnet/tx/d35c95b0c65ddaedee2b85cd52a5d248571abb36d56c42c3599235ef8d64c6e0" target="_blank" rel="noreferrer">Disclosure VK</a>
+        </div>
+      </section>
+
+      <section class="panel" id="proof">
+        <div class="section-head">
+          <h2>Receipt Proof</h2>
+          <p>
+            The withdrawal nullifier in both public-signal arrays matches. The
+            receipt links a spent nullifier to a real deposited commitment and a
+            disclosed amount.
+          </p>
+        </div>
+        <div class="code-grid">
+          <div>
+            <h3>Withdrawal public signals</h3>
+            <pre><code>[
+  "33832171054643436472546998686772011210227251098487950275135154568712175384598",
+  "1000000000",
+  "30162851960749159054107963444341137279716337900493764726816877893946218126682",
+  "30671046209969431012473152916297518771579159592633900587133061089753651787613"
+]</code></pre>
+          </div>
+          <div>
+            <h3>Disclosure public signals</h3>
+            <pre><code>[
+  "33832171054643436472546998686772011210227251098487950275135154568712175384598",
+  "792451850146572312119437015092516461585820411321474856545290648487812800938",
+  "13601723215849916214344531109121559986847487952922840288412049033564696840611",
+  "49445820628079692271178516198415444927595013704302380125940463497865958044604"
+]</code></pre>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel" id="security">
+        <div class="section-head">
+          <h2>Audit Response</h2>
+          <p>
+            The submission is honest about v1 limits and includes a real fix for
+            the public-signal canonicalization issue found during review.
+          </p>
+        </div>
+        <div class="cards">
+          <article>
+            <h3>Fixed</h3>
+            <p>
+              Public signals now reject malformed bytes and non-canonical
+              BLS12-381 scalar encodings before nullifier or root comparisons.
+            </p>
+          </article>
+          <article>
+            <h3>Scoped</h3>
+            <p>
+              `recipientId` and `purpose` are prover-asserted context in v1.
+              The amount is the committed value; production should bind context
+              at deposit or through a signed off-ramp record.
+            </p>
+          </article>
+          <article>
+            <h3>Tested</h3>
+            <p>
+              The workspace test suite covers malformed proofs, truncated
+              public signals, non-canonical public signals, and disclosure
+              verifier negative cases.
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <section class="panel" id="run">
+        <div class="section-head">
+          <h2>Run It</h2>
+          <p>
+            The repository includes a reproducible PowerShell script for the
+            patched testnet path.
+          </p>
+        </div>
+        <pre><code>cd C:\Users\bbook\Desktop\zk\fork
+cargo test
+cargo build --target wasm32v1-none --release -p privacy-pools
+.\scripts\live_testnet_e2e.ps1</code></pre>
+      </section>
+    </main>
+    <script src="./app.js"></script>
+  </body>
+</html>

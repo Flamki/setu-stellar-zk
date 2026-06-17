@@ -1,0 +1,9 @@
+{
+  "value": "100",
+  "label": "42",
+  "nullifier": "12345",
+  "secret": "67890",
+  "recipientId": "11111",
+  "purpose": "7",
+  "viewingKey": "99999"
+}

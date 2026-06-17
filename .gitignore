@@ -1,0 +1,27 @@
+# Rust's output directory
+target
+test_snapshots
+# circuits build
+circuits/build
+circuits/build_disc
+circuits/output
+circuits/input
+circuits/test/node_modules
+circuits/*.wtns
+circuits/test/*.wtns
+circuits/test/*.wtns.json
+circuits/*_proof.json
+circuits/*_public.json
+demo_*.json
+withdrawal_input.json
+deploy_output.txt
+setu_contract_id.txt
+setu_fresh_disclosure_result.json
+*_hex.txt
+# Local settings
+.soroban
+.stellar
+site/.vercel
+.vscode
+# Agents
+.claude
