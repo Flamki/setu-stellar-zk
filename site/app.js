@@ -66,6 +66,13 @@ const activities = [
   },
 ];
 
+function updateViewportMetrics() {
+  document.documentElement.style.setProperty(
+    "--setu-client-width",
+    `${document.documentElement.clientWidth}px`,
+  );
+}
+
 // Helper: Toast Message
 function showToast(message) {
   toast.textContent = message;
@@ -1124,5 +1131,8 @@ function initFooterShader() {
 
 // Initialise on load
 window.addEventListener("DOMContentLoaded", () => {
+  updateViewportMetrics();
   initFooterShader();
 });
+
+window.addEventListener("resize", updateViewportMetrics);

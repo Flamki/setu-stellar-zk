@@ -2907,7 +2907,10 @@ pre code {
 /* Landing Page Footer and WebGL Shader */
 .landing-footer {
   position: relative;
-  width: 100%;
+  left: auto;
+  width: var(--setu-client-width, 100vw);
+  margin-left: calc((100% - var(--setu-client-width, 100vw)) / 2);
+  margin-right: calc((100% - var(--setu-client-width, 100vw)) / 2);
   min-height: 240px;
   background: #000000;
   border-top: 1px solid var(--border-color);
