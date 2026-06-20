@@ -134,7 +134,7 @@ function renderAuthAvailability() {
 
   setAuthControlsEnabled(false);
   setAuthStatus(
-    "Authentication is not configured on this deployment. Add SETU_SUPABASE_URL and SETU_SUPABASE_ANON_KEY in Vercel, then redeploy.",
+    "Account access is being provisioned for this deployment. Connect Setu's Supabase workspace to enable sign-in.",
     "error",
   );
 }
