@@ -1078,7 +1078,7 @@ textarea {
 /* Landing Page Layout & Grid */
 .landing-view {
   width: 100%;
-  max-width: 1320px;
+  max-width: 1240px;
   margin: 0 auto;
   padding: 0 24px;
   position: relative;
@@ -1256,11 +1256,11 @@ textarea {
 /* Hero Section */
 .landing-hero {
   display: grid;
-  grid-template-columns: minmax(0, 0.9fr) minmax(480px, 1.1fr);
-  gap: clamp(48px, 6vw, 92px);
+  grid-template-columns: minmax(0, 0.96fr) minmax(440px, 1.04fr);
+  gap: clamp(36px, 5vw, 72px);
   align-items: center;
   min-height: calc(100vh - 90px);
-  padding: 30px 0 68px;
+  padding: 36px 0 64px;
   position: relative;
   isolation: isolate;
 }
@@ -1276,31 +1276,30 @@ textarea {
   z-index: -3;
   pointer-events: none;
   background:
-    radial-gradient(circle at 18% 44%, rgba(245, 158, 11, 0.16), transparent 25%),
-    radial-gradient(circle at 74% 42%, rgba(124, 58, 237, 0.24), transparent 38%),
-    linear-gradient(180deg, rgba(0, 0, 0, 0.08) 0%, rgba(20, 11, 48, 0.22) 44%, rgba(0, 0, 0, 0.72) 100%),
-    repeating-linear-gradient(102deg, rgba(255, 255, 255, 0.022) 0 1px, transparent 1px 7px);
+    linear-gradient(180deg, rgba(0, 0, 0, 0.14) 0%, rgba(20, 11, 48, 0.28) 44%, rgba(0, 0, 0, 0.58) 100%),
+    linear-gradient(100deg, rgba(245, 158, 11, 0.08), transparent 26%, rgba(16, 185, 129, 0.08) 100%),
+    repeating-linear-gradient(102deg, rgba(255, 255, 255, 0.026) 0 1px, transparent 1px 7px);
   opacity: 0.68;
 }
 
 .landing-hero::after {
   content: "";
   position: absolute;
-  right: -4px;
-  top: 15%;
-  width: min(54vw, 760px);
-  height: 68%;
-  border-radius: 30px;
+  right: -22px;
+  top: 18%;
+  width: min(50vw, 680px);
+  height: 62%;
+  border-radius: 22px;
   z-index: -2;
   pointer-events: none;
   background:
-    linear-gradient(180deg, rgba(236, 223, 255, 0.28) 0%, rgba(124, 58, 237, 0.14) 42%, rgba(6, 5, 16, 0.9) 100%),
-    repeating-linear-gradient(97deg, rgba(255, 255, 255, 0.054) 0 1px, transparent 1px 5px),
-    linear-gradient(90deg, rgba(67, 56, 202, 0.18), rgba(16, 185, 129, 0.13));
+    linear-gradient(180deg, rgba(236, 223, 255, 0.32) 0%, rgba(124, 58, 237, 0.18) 46%, rgba(6, 5, 16, 0.86) 100%),
+    repeating-linear-gradient(97deg, rgba(255, 255, 255, 0.06) 0 1px, transparent 1px 5px),
+    linear-gradient(90deg, rgba(67, 56, 202, 0.26), rgba(16, 185, 129, 0.1));
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.14),
     0 28px 90px rgba(20, 6, 64, 0.34);
-  opacity: 0.5;
+  opacity: 0.42;
 }
 
 .hero-text .eyebrow {
@@ -1322,28 +1321,28 @@ textarea {
 }
 
 .hero-text h1 {
-  font-size: clamp(3.15rem, 5.6vw, 5.7rem);
-  line-height: 0.9;
+  font-size: clamp(3rem, 5.15vw, 5.05rem);
+  line-height: 0.92;
   font-weight: 800;
-  margin-bottom: 26px;
+  margin-bottom: 24px;
   letter-spacing: -0.025em;
   color: var(--text-primary);
   text-shadow: 0 18px 46px rgba(0, 0, 0, 0.44);
 }
 
 .hero-text h1 .gradient-text {
-  background: linear-gradient(110deg, #fff7df 0%, var(--color-amber) 20%, var(--color-orange) 48%, var(--color-emerald) 88%);
+  background: linear-gradient(110deg, #ffffff 0%, var(--color-amber) 16%, var(--color-orange) 46%, var(--color-emerald) 82%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   display: inline;
 }
 
 .hero-text p {
-  font-size: 1.08rem;
+  font-size: 1.06rem;
   line-height: 1.6;
   margin-bottom: 32px;
   color: rgba(255, 255, 255, 0.72);
-  max-width: 600px;
+  max-width: 560px;
 }
 
 .hero-badges {
@@ -1413,7 +1412,7 @@ textarea {
   display: grid;
   gap: 14px;
   align-self: center;
-  transform: translateY(-4px);
+  transform: translateY(-8px);
   position: relative;
   z-index: 1;
 }
@@ -1421,17 +1420,16 @@ textarea {
 .hero-product-stack::before {
   content: "";
   position: absolute;
-  inset: -36px -30px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 32px;
+  inset: -26px -22px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 26px;
   background:
-    radial-gradient(circle at 50% 0%, rgba(236, 223, 255, 0.28), transparent 36%),
-    linear-gradient(180deg, rgba(236, 223, 255, 0.14) 0%, rgba(124, 58, 237, 0.11) 38%, rgba(2, 2, 8, 0.88) 100%),
-    repeating-linear-gradient(102deg, rgba(255, 255, 255, 0.05) 0 1px, transparent 1px 6px);
+    linear-gradient(180deg, rgba(236, 223, 255, 0.16) 0%, rgba(124, 58, 237, 0.13) 38%, rgba(2, 2, 8, 0.84) 100%),
+    repeating-linear-gradient(102deg, rgba(255, 255, 255, 0.055) 0 1px, transparent 1px 6px);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.12),
-    0 40px 120px rgba(7, 3, 25, 0.7);
-  opacity: 0.9;
+    0 36px 100px rgba(7, 3, 25, 0.62);
+  opacity: 0.84;
   z-index: -1;
 }
 
@@ -1447,54 +1445,6 @@ textarea {
   box-shadow:
     0 0 18px rgba(245, 158, 11, 0.28),
     0 0 28px rgba(16, 185, 129, 0.2);
-}
-
-.corridor-lattice {
-  position: absolute;
-  inset: -46px -40px;
-  z-index: -1;
-  overflow: hidden;
-  border-radius: 34px;
-  pointer-events: none;
-}
-
-.corridor-lattice::before,
-.corridor-lattice::after,
-.corridor-lattice span {
-  content: "";
-  position: absolute;
-  left: -10%;
-  right: -10%;
-  height: 2px;
-  border-radius: 999px;
-  background: linear-gradient(90deg, transparent, rgba(245, 158, 11, 0.2), rgba(16, 185, 129, 0.36), transparent);
-  box-shadow: 0 0 28px rgba(16, 185, 129, 0.16);
-  transform: rotate(-9deg);
-}
-
-.corridor-lattice::before {
-  top: 24%;
-}
-
-.corridor-lattice::after {
-  top: 62%;
-  opacity: 0.7;
-}
-
-.corridor-lattice span:nth-child(1) {
-  top: 38%;
-  opacity: 0.92;
-}
-
-.corridor-lattice span:nth-child(2) {
-  top: 50%;
-  background: linear-gradient(90deg, transparent, rgba(124, 58, 237, 0.5), rgba(245, 158, 11, 0.22), transparent);
-  opacity: 0.55;
-}
-
-.corridor-lattice span:nth-child(3) {
-  top: 76%;
-  opacity: 0.42;
 }
 
 .hero-rail-strip {
@@ -2937,11 +2887,6 @@ pre code {
     inset: -20px -16px;
   }
 
-  .corridor-lattice {
-    inset: -28px -20px;
-    opacity: 0.68;
-  }
-
   .proof-strip {
     grid-template-columns: 1fr;
   }
@@ -3011,12 +2956,6 @@ pre code {
     inset: -14px -10px;
     border-radius: 18px;
     opacity: 0.72;
-  }
-
-  .corridor-lattice {
-    inset: -18px -12px;
-    border-radius: 20px;
-    opacity: 0.46;
   }
 
   .hero-rail-strip {
