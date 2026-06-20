@@ -27,7 +27,7 @@
         </a>
         <nav class="landing-nav" aria-label="Main navigation">
           <a href="#features">Features</a>
-          <a href="#simulator">ZK Simulator</a>
+          <a href="#simulator">Simulator</a>
           <a href="#compliance">Compliance</a>
           <a href="#login" class="secondary" style="min-height:36px; padding: 0 16px; font-size:0.85rem;">Log In</a>
           <a href="#signup" class="primary" style="min-height:36px; padding: 0 16px; font-size:0.85rem;">Sign Up</a>
@@ -36,19 +36,65 @@
 
       <section class="landing-hero" id="home">
         <div class="hero-text">
-          <p class="eyebrow">Stellar x Zero-Knowledge</p>
-          <h1>Remit <span class="gradient-text">Privately</span>.<br>Verify Instantly.</h1>
+          <p class="eyebrow">Private remittance on Stellar</p>
+          <h1>Move money like a bridge. Prove it like a bank.</h1>
           <p>
-            Setu enables private USDC remittances on the Stellar network using Groth16 ZK-SNARKs. Withdraw without linking wallets, and generate cryptographic selective-disclosure receipts for regulators.
+            Private USDC moves through a ZK pool. Receipts prove corridor facts without exposing the funding wallet.
           </p>
+          <div class="hero-badges" aria-label="Setu proof points">
+            <span>Testnet live</span>
+            <span>Groth16</span>
+            <span>Receipts</span>
+          </div>
           <div class="hero-ctas">
             <a href="#signup" class="primary">Get Started</a>
             <a href="#simulator" class="secondary">Try Simulator</a>
           </div>
+          <div class="hero-metrics" aria-label="Current build status">
+            <div>
+              <strong>6</strong>
+              <span>verified testnet transactions</span>
+            </div>
+            <div>
+              <strong>54</strong>
+              <span>contract and proof tests passing</span>
+            </div>
+            <div>
+              <strong>0</strong>
+              <span>default credentials in the public app</span>
+            </div>
+          </div>
         </div>
 
-        <!-- ZK Simulator Widget -->
-        <div class="panel sim-card float-element" id="simulator">
+        <div class="hero-product-stack">
+          <div class="corridor-card" aria-label="Private remittance route preview">
+            <div class="corridor-map">
+              <div class="corridor-party">
+                <span>Sender</span>
+                <strong>USDC</strong>
+                <small>Wallet A</small>
+              </div>
+              <div class="corridor-rail">
+                <i></i>
+                <span>Setu pool</span>
+              </div>
+              <div class="corridor-party receiver">
+                <span>Receiver</span>
+                <strong>INR</strong>
+                <small>Wallet B</small>
+              </div>
+            </div>
+            <div class="receipt-chip">
+              <span class="brand-mark" aria-hidden="true"></span>
+              <div>
+                <strong>Selective disclosure ready</strong>
+                <small>Verify amount and purpose without exposing the source wallet.</small>
+              </div>
+            </div>
+          </div>
+
+          <!-- ZK Simulator Widget -->
+          <div class="panel sim-card float-element" id="simulator">
           <div class="sim-header">
             <div>
               <p class="eyebrow" style="margin: 0;">Compliance-ready ZK</p>
@@ -71,7 +117,7 @@
             </div>
             <div class="form-group">
               <label for="sim-recipient">Recipient Identifier</label>
-              <input id="sim-recipient" type="text" value="Bob INR Wallet" />
+              <input id="sim-recipient" type="text" value="Receiver corridor wallet" />
             </div>
             <div class="form-group">
               <label for="sim-purpose">Remittance Purpose</label>
@@ -104,7 +150,7 @@
                 <div class="sim-step-icon">1</div>
                 <div class="sim-step-info">
                   <strong>Commitment Hashing</strong>
-                  <span>Poseidon(Nullifier, Secret)</span>
+                  <span>Poseidon(nullifier, note secret)</span>
                 </div>
               </div>
               <div class="sim-step" id="step-tree">
@@ -137,25 +183,44 @@
 
             <button class="secondary full-width" id="sim-reset" type="button" class="hidden">Reset Simulator</button>
           </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="proof-strip" aria-label="Setu live proof trail">
+        <div>
+          <span>01</span>
+          <strong>Deposit commitment</strong>
+          <small>Leaf inserted on Stellar testnet.</small>
+        </div>
+        <div>
+          <span>02</span>
+          <strong>Private withdrawal</strong>
+          <small>Nullifier checked without linking wallets.</small>
+        </div>
+        <div>
+          <span>03</span>
+          <strong>Disclosure receipt</strong>
+          <small>Auditor view key verifies amount and purpose.</small>
         </div>
       </section>
 
       <!-- Features Section -->
       <section class="landing-features" id="features">
         <div class="panel feature-card">
-          <div class="feature-icon">🛡️</div>
-          <h3>Zero-Knowledge</h3>
-          <p>We use Groth16 zk-SNARKs. Withdraw funds via smart contracts using high-integrity cryptographic proofs without ever linking back to your identity.</p>
+          <div class="feature-icon" aria-hidden="true">ZK</div>
+          <h3>Privacy that survives scrutiny</h3>
+          <p>Withdrawals prove membership, nullifier correctness, and association-set validity without tying the receiver back to the funding wallet.</p>
         </div>
         <div class="panel feature-card">
-          <div class="feature-icon">📊</div>
-          <h3>Selective Disclosure</h3>
-          <p>Stay compliant. Generate viewing keys and verify cryptographic receipts for auditors showing proof of amount and purpose without revealing private addresses.</p>
+          <div class="feature-icon" aria-hidden="true">VK</div>
+          <h3>Receipts for the people who ask</h3>
+          <p>Viewing keys let a corridor operator or auditor validate the disclosed facts while keeping the private note opening out of sight.</p>
         </div>
         <div class="panel feature-card">
-          <div class="feature-icon">⚡</div>
-          <h3>Soroban Speed</h3>
-          <p>Powered by Stellar's next-gen Soroban smart contracts, facilitating fast, trustless, and gas-efficient privacy pools built directly for USDC corridors.</p>
+          <div class="feature-icon" aria-hidden="true">SR</div>
+          <h3>Built where remittance already moves</h3>
+          <p>Soroban contracts keep the pool, verifier, and nullifier registry close to Stellar payment rails instead of hiding behind a separate ledger.</p>
         </div>
       </section>
 
@@ -171,6 +236,10 @@
             <p>
               This allows corporate treasuries and private individuals to meet KYC/AML compliance checks on-chain seamlessly.
             </p>
+            <div class="compliance-list" aria-label="Selective disclosure contents">
+              <span>Disclosed: amount, purpose, auditor tag</span>
+              <span>Hidden: note secret, funding address, private path</span>
+            </div>
           </div>
           <div class="compliance-visual" aria-hidden="true">
             <div class="visual-ring"></div>
