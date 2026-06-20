@@ -6,7 +6,7 @@
 //!
 //! A receipt proves (via circuits/disclosure.circom) that a settled withdrawal
 //! corresponds to a real deposit and that the disclosed amount equals the
-//! committed value. The current hackathon build treats recipient and purpose as
+//! committed value. The current testnet build treats recipient and purpose as
 //! prover-asserted context hashed into the receipt, not deposit-time facts.
 
 use soroban_sdk::{contractimpl, symbol_short, vec, Address, Bytes, BytesN, Env, Symbol, Vec};

@@ -4,7 +4,7 @@
 #   bash scripts/disclosure_e2e.sh
 #
 # Requires circom 2.2.x, snarkjs, and circomlib. This generates a local
-# single-contributor Groth16 setup for demo/testing only, not production.
+# single-contributor Groth16 setup for staging/testing only, not production.
 set -euo pipefail
 
 CIRC=circuits

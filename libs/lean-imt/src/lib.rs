@@ -471,7 +471,7 @@ impl LeanIMT {
         self.get_node(level, sibling_index)
     }
 
-    /// Demonstrates the "Clever shortcut 2" optimization concept
+    /// Shows the "Clever shortcut 2" optimization concept
     /// Shows which subtrees would be reused vs recomputed for a new leaf
     ///
     /// This method analyzes the path from a new leaf to the root and identifies

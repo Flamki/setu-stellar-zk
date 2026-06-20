@@ -10,14 +10,335 @@
     <title>Setu - Private Remittances on Stellar</title>
     <link
       rel="icon"
-      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%230b1412'/%3E%3Cpath d='M14 39c12-18 24-18 36 0' fill='none' stroke='%234fc3b1' stroke-width='6' stroke-linecap='round'/%3E%3Ccircle cx='18' cy='40' r='5' fill='%23f2c14e'/%3E%3Ccircle cx='46' cy='40' r='5' fill='%234fc3b1'/%3E%3C/svg%3E"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%23060c0a'/%3E%3Cpath d='M14 39c12-18 24-18 36 0' fill='none' stroke='%2300f5a0' stroke-width='6' stroke-linecap='round'/%3E%3Ccircle cx='18' cy='40' r='5' fill='%23f59e0b'/%3E%3Ccircle cx='46' cy='40' r='5' fill='%2300f5a0'/%3E%3C/svg%3E"
     />
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
-    <main class="app-shell">
+    <!-- 1. LANDING PAGE VIEW -->
+    <div id="landing-page" class="landing-view">
+      <header class="landing-header">
+        <a class="brand" href="#home" aria-label="Setu home">
+          <span class="brand-mark" aria-hidden="true">S</span>
+          <span>
+            <strong>Setu</strong>
+            <small>Stellar private remittance</small>
+          </span>
+        </a>
+        <nav class="landing-nav" aria-label="Main navigation">
+          <a href="#features">Features</a>
+          <a href="#simulator">ZK Simulator</a>
+          <a href="#compliance">Compliance</a>
+          <a href="#login" class="secondary" style="min-height:36px; padding: 0 16px; font-size:0.85rem;">Log In</a>
+          <a href="#signup" class="primary" style="min-height:36px; padding: 0 16px; font-size:0.85rem;">Sign Up</a>
+        </nav>
+      </header>
+
+      <section class="landing-hero" id="home">
+        <div class="hero-text">
+          <p class="eyebrow">Stellar x Zero-Knowledge</p>
+          <h1>Remit <span class="gradient-text">Privately</span>.<br>Verify Instantly.</h1>
+          <p>
+            Setu enables private USDC remittances on the Stellar network using Groth16 ZK-SNARKs. Withdraw without linking wallets, and generate cryptographic selective-disclosure receipts for regulators.
+          </p>
+          <div class="hero-ctas">
+            <a href="#signup" class="primary">Get Started</a>
+            <a href="#simulator" class="secondary">Try Simulator</a>
+          </div>
+        </div>
+
+        <!-- ZK Simulator Widget -->
+        <div class="panel sim-card float-element" id="simulator">
+          <div class="sim-header">
+            <div>
+              <p class="eyebrow" style="margin: 0;">Compliance-ready ZK</p>
+              <h3>ZK-SNARK Simulator</h3>
+            </div>
+            <span class="pill" id="sim-status">Idle</span>
+          </div>
+
+          <!-- Simulator Input Form -->
+          <form id="sim-form" class="sim-form">
+            <div class="form-group">
+              <label for="sim-amount">Amount (USDC equivalent)</label>
+              <div class="amount-row">
+                <input id="sim-amount" type="number" min="10" value="100" />
+                <select id="sim-asset" aria-label="Asset selection">
+                  <option>USDC</option>
+                  <option>XLM</option>
+                </select>
+              </div>
+            </div>
+            <div class="form-group">
+              <label for="sim-recipient">Recipient Identifier</label>
+              <input id="sim-recipient" type="text" value="Bob INR Wallet" />
+            </div>
+            <div class="form-group">
+              <label for="sim-purpose">Remittance Purpose</label>
+              <select id="sim-purpose">
+                <option>Family support</option>
+                <option>Education</option>
+                <option>Medical</option>
+                <option>Business invoice</option>
+              </select>
+            </div>
+            <button class="primary full-width" type="submit">Run ZK Proof Simulation</button>
+          </form>
+
+          <!-- Simulator Running State -->
+          <div id="sim-running" class="sim-running hidden">
+            <!-- Simulated nodes drawing -->
+            <div style="display:flex; justify-content:center; align-items:center; height:50px;">
+              <svg width="240" height="40" viewBox="0 0 240 40" aria-hidden="true" style="overflow:visible;">
+                <circle cx="20" cy="20" r="8" fill="#00f5a0" />
+                <path d="M 28,20 L 100,20" stroke="#00f5a0" stroke-width="2" stroke-dasharray="5 5" style="animation: dash 2s linear infinite;" />
+                <circle cx="110" cy="20" r="8" fill="#00d9f5" />
+                <path d="M 118,20 L 190,20" stroke="#00d9f5" stroke-width="2" stroke-dasharray="5 5" style="animation: dash 2s linear infinite;" />
+                <circle cx="200" cy="20" r="8" fill="#f59e0b" />
+              </svg>
+            </div>
+
+            <!-- Stepper -->
+            <div class="sim-steps">
+              <div class="sim-step" id="step-deposit">
+                <div class="sim-step-icon">1</div>
+                <div class="sim-step-info">
+                  <strong>Commitment Hashing</strong>
+                  <span>Poseidon(Nullifier, Secret)</span>
+                </div>
+              </div>
+              <div class="sim-step" id="step-tree">
+                <div class="sim-step-icon">2</div>
+                <div class="sim-step-info">
+                  <strong>Merkle Insertion</strong>
+                  <span>Updating root on Stellar contract</span>
+                </div>
+              </div>
+              <div class="sim-step" id="step-proof">
+                <div class="sim-step-icon">3</div>
+                <div class="sim-step-info">
+                  <strong>Synthesizing Groth16</strong>
+                  <span>Witness computed, proof generated</span>
+                </div>
+              </div>
+              <div class="sim-step" id="step-verify">
+                <div class="sim-step-icon">4</div>
+                <div class="sim-step-info">
+                  <strong>On-chain Verification</strong>
+                  <span>Soroban contract verifier returns true</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Console Log -->
+            <div class="sim-console" id="sim-console" role="log" aria-live="polite">
+              Waiting to compile ZK parameters...
+            </div>
+
+            <button class="secondary full-width" id="sim-reset" type="button" class="hidden">Reset Simulator</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Features Section -->
+      <section class="landing-features" id="features">
+        <div class="panel feature-card">
+          <div class="feature-icon">🛡️</div>
+          <h3>Zero-Knowledge</h3>
+          <p>We use Groth16 zk-SNARKs. Withdraw funds via smart contracts using high-integrity cryptographic proofs without ever linking back to your identity.</p>
+        </div>
+        <div class="panel feature-card">
+          <div class="feature-icon">📊</div>
+          <h3>Selective Disclosure</h3>
+          <p>Stay compliant. Generate viewing keys and verify cryptographic receipts for auditors showing proof of amount and purpose without revealing private addresses.</p>
+        </div>
+        <div class="panel feature-card">
+          <div class="feature-icon">⚡</div>
+          <h3>Soroban Speed</h3>
+          <p>Powered by Stellar's next-gen Soroban smart contracts, facilitating fast, trustless, and gas-efficient privacy pools built directly for USDC corridors.</p>
+        </div>
+      </section>
+
+      <!-- Compliance Section -->
+      <section class="landing-compliance" id="compliance">
+        <div class="panel compliance-panel">
+          <div>
+            <p class="eyebrow">Auditable Privacy</p>
+            <h2>Built for Regulatory Standards</h2>
+            <p>
+              Unlike legacy privacy pools that hide transaction traces entirely, Setu introduces a selective disclosure receipt. Receivers can construct a cryptographic witness proving a specific withdrawal was sourced from a valid deposit, without revealing the deposit address.
+            </p>
+            <p>
+              This allows corporate treasuries and private individuals to meet KYC/AML compliance checks on-chain seamlessly.
+            </p>
+          </div>
+          <div class="compliance-visual" aria-hidden="true">
+            <div class="visual-ring"></div>
+            <div class="visual-shield"></div>
+            <div class="visual-node">Setu ZK</div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <!-- 2. AUTHENTICATION PAGES (DEDICATED WRAPPERS) -->
+    <div id="auth-page" class="auth-view" style="display:none;">
+      <section class="auth-story" aria-label="Setu trust story">
+        <div class="auth-story-media" aria-hidden="true">
+          <img src="./assets/setu-product.png" alt="" />
+          <div class="auth-orbit auth-orbit-one"></div>
+          <div class="auth-orbit auth-orbit-two"></div>
+        </div>
+        <div class="auth-story-content">
+          <a class="brand auth-brand" href="#home" aria-label="Setu home">
+            <span class="brand-mark" aria-hidden="true">S</span>
+            <span>
+              <strong>Setu</strong>
+              <small>Stellar private remittance</small>
+            </span>
+          </a>
+          <div>
+            <p class="eyebrow">Private remittance desk</p>
+            <h1 id="auth-story-title">Welcome back to Setu</h1>
+            <p id="auth-story-copy">
+              Continue from a verified Stellar testnet flow with private
+              withdrawals, disclosure receipts, and tamper-resistant audit
+              evidence in one workspace.
+            </p>
+          </div>
+          <div class="auth-step-list" aria-label="Account setup progress">
+            <div class="auth-step-item active">
+              <span class="auth-step-num">1</span>
+              <span id="auth-step-one">Enter secure credentials</span>
+            </div>
+            <div class="auth-step-item inactive">
+              <span class="auth-step-num">2</span>
+              <span>Open remittance workspace</span>
+            </div>
+            <div class="auth-step-item inactive">
+              <span class="auth-step-num">3</span>
+              <span>Generate proof receipts</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="auth-form-shell" aria-label="Setu authentication">
+        <div class="auth-card" id="login-card">
+          <div class="auth-kicker">
+            <span class="mini-mark" aria-hidden="true"></span>
+            Setu account
+          </div>
+          <div class="auth-header">
+            <h2>Sign in</h2>
+            <p>Welcome back. Access your private remittance desk.</p>
+          </div>
+          <div class="social-btn-row">
+            <button class="social-btn" type="button" data-login-shortcut="alice@setu.example">
+              <span aria-hidden="true">G</span>
+              Google
+            </button>
+            <button class="social-btn" type="button" data-login-shortcut="auditor@setu.example">
+              <span aria-hidden="true">GH</span>
+              GitHub
+            </button>
+          </div>
+          <div class="separator-row">
+            <span class="separator-text">or continue with email</span>
+          </div>
+          <form id="login-form" class="auth-form">
+            <div class="form-group">
+              <label for="login-email">Email address</label>
+              <input id="login-email" type="email" value="alice@setu.example" autocomplete="email" required />
+            </div>
+            <div class="form-group">
+              <div class="label-row">
+                <label for="login-password">Password</label>
+                <a href="#signup">Need access?</a>
+              </div>
+              <div class="password-wrapper">
+                <input id="login-password" type="password" value="password" autocomplete="current-password" required />
+                <button class="eye-btn" type="button" data-password-toggle="login-password" aria-label="Show password">
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z"></path>
+                    <circle cx="12" cy="12" r="3"></circle>
+                  </svg>
+                </button>
+              </div>
+            </div>
+            <button class="primary full-width auth-submit" type="submit">Sign in</button>
+            <button class="secondary full-width auth-shortcut" id="login-bypass" type="button">Open staging workspace</button>
+          </form>
+          <p class="auth-switch-text">
+            New to Setu? <button id="to-signup" type="button">Create account</button>
+          </p>
+        </div>
+
+        <div class="auth-card" id="signup-card" style="display:none;">
+          <div class="auth-kicker">
+            <span class="mini-mark" aria-hidden="true"></span>
+            Team onboarding
+          </div>
+          <div class="auth-header">
+            <h2>Create account</h2>
+            <p>Start with a compliant privacy-pool workspace on Stellar.</p>
+          </div>
+          <div class="social-btn-row">
+            <button class="social-btn" type="button" data-signup-shortcut="Alice Mehta|alice@setu.example">
+              <span aria-hidden="true">G</span>
+              Google
+            </button>
+            <button class="social-btn" type="button" data-signup-shortcut="Audit Lead|auditor@setu.example">
+              <span aria-hidden="true">GH</span>
+              GitHub
+            </button>
+          </div>
+          <div class="separator-row">
+            <span class="separator-text">or register with email</span>
+          </div>
+          <form id="signup-form" class="auth-form">
+            <div class="auth-name-grid">
+              <div class="form-group">
+                <label for="signup-first">First name</label>
+                <input id="signup-first" type="text" value="Alice" autocomplete="given-name" required />
+              </div>
+              <div class="form-group">
+                <label for="signup-last">Last name</label>
+                <input id="signup-last" type="text" value="Mehta" autocomplete="family-name" required />
+              </div>
+            </div>
+            <input id="signup-name" type="hidden" value="Alice Mehta" />
+            <div class="form-group">
+              <label for="signup-email">Email address</label>
+              <input id="signup-email" type="email" value="alice@setu.example" autocomplete="email" required />
+            </div>
+            <div class="form-group">
+              <label for="signup-password">Password</label>
+              <div class="password-wrapper">
+                <input id="signup-password" type="password" value="password" autocomplete="new-password" required />
+                <button class="eye-btn" type="button" data-password-toggle="signup-password" aria-label="Show password">
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z"></path>
+                    <circle cx="12" cy="12" r="3"></circle>
+                  </svg>
+                </button>
+              </div>
+              <p class="field-hint">Use 8 or more characters for production accounts.</p>
+            </div>
+            <button class="primary full-width auth-submit" type="submit">Create account</button>
+            <button class="secondary full-width auth-shortcut" id="signup-bypass" type="button">Open staging workspace</button>
+          </form>
+          <p class="auth-switch-text">
+            Already have an account? <button id="to-login" type="button">Sign in</button>
+          </p>
+        </div>
+      </section>
+    </div>
+
+    <!-- 3. MAIN DASHBOARD SHELL (APP WORKSPACE) -->
+    <div id="app-workspace" class="app-shell" style="display:none;">
       <aside class="sidebar" aria-label="Setu navigation">
-        <a class="brand" href="#overview" aria-label="Setu home">
+        <a class="brand" href="#dashboard" aria-label="Setu home">
           <span class="brand-mark" aria-hidden="true">S</span>
           <span>
             <strong>Setu</strong>
@@ -25,20 +346,43 @@
           </span>
         </a>
 
-        <nav class="side-nav" aria-label="Primary">
-          <button class="nav-item active" data-view="overview" onclick="setView('overview')">Overview</button>
-          <button class="nav-item" data-view="send" onclick="setView('send')">Send</button>
-          <button class="nav-item" data-view="receive" onclick="setView('receive')">Receive</button>
-          <button class="nav-item" data-view="receipts" onclick="setView('receipts')">Receipts</button>
-          <button class="nav-item" data-view="contract" onclick="setView('contract')">Contract</button>
+        <nav class="side-nav" aria-label="Primary nav">
+          <button class="nav-item active" data-view="overview">
+            <span>📊</span> Overview
+          </button>
+          <button class="nav-item" data-view="send">
+            <span>💸</span> Send
+          </button>
+          <button class="nav-item" data-view="receive">
+            <span>📥</span> Receive
+          </button>
+          <button class="nav-item" data-view="receipts">
+            <span>📜</span> Receipts
+          </button>
+          <button class="nav-item" data-view="contract">
+            <span>⚙️</span> Contract
+          </button>
         </nav>
 
-        <section class="identity-panel" aria-label="Demo profile">
-          <p class="eyebrow">Signed in as</p>
+        <section class="identity-panel" aria-label="Account profile">
+          <p class="eyebrow" style="margin-bottom:4px;">Signed in as</p>
           <strong id="profile-name">Guest account</strong>
-          <span id="profile-email">guest@setu.demo</span>
+          <span id="profile-email">guest@setu.example</span>
           <button class="secondary full-width" id="wallet-button" type="button">
             Connect wallet
+          </button>
+          <span class="wallet-status" id="wallet-status">No wallet connected</span>
+          <a
+            class="wallet-help-link"
+            id="wallet-help-link"
+            href="https://chromewebstore.google.com/detail/freighter/bcacfldlkkdogcmkkibnjlakofdplcbk"
+            target="_blank"
+            rel="noreferrer"
+          >
+            Install Freighter
+          </a>
+          <button class="secondary full-width" id="logout-button" style="margin-top:8px; border-color:transparent; background:transparent; color:var(--text-muted);" type="button">
+            Log out
           </button>
         </section>
       </aside>
@@ -46,10 +390,13 @@
       <section class="workspace">
         <header class="topbar">
           <div>
-            <p class="eyebrow">Live testnet prototype</p>
-            <h1>Private remittance desk</h1>
+            <p class="eyebrow">Live testnet build</p>
+            <h1>Private Remittance Desk</h1>
           </div>
           <div class="top-actions">
+            <button class="secondary wallet-connect-action" data-wallet-connect type="button">
+              Connect wallet
+            </button>
             <a
               class="secondary"
               href="https://github.com/Flamki/setu-stellar-zk"
@@ -58,48 +405,71 @@
             >
               GitHub
             </a>
-            <button class="secondary" id="signin-open" onclick="openAuth('login')" type="button">Log in</button>
-            <button class="primary" id="signup-open" onclick="openAuth('signup')" type="button">Sign up</button>
+            <button class="secondary" id="logout-top" type="button">Log out</button>
           </div>
         </header>
 
+        <!-- VIEW: Overview -->
         <section class="view active" id="overview">
           <div class="hero-grid">
-            <div class="hero-copy">
+            <div class="panel hero-copy">
               <p class="eyebrow">USD to INR corridor</p>
               <h2>Send privately. Prove only what compliance needs.</h2>
               <p>
-                Alice deposits a fixed-value note, Bob withdraws with a ZK proof,
-                and an auditor can verify a selective-disclosure receipt tied to
-                the spent nullifier.
+                Alice deposits a fixed-value note, Bob withdraws with a ZK proof, and an auditor can verify a selective-disclosure receipt tied to the spent nullifier.
               </p>
               <div class="hero-actions">
-                <button class="primary" data-view-link="send" onclick="setView('send')" type="button">New transfer</button>
-                <button class="secondary" data-view-link="receipts" onclick="setView('receipts')" type="button">Open receipts</button>
+                <button class="primary" onclick="setView('send')" type="button">New transfer</button>
+                <button class="secondary" onclick="setView('receipts')" type="button">Open receipts</button>
               </div>
             </div>
-            <figure class="product-shot">
-              <img src="./assets/setu-product.png" alt="Setu remittance dashboard preview" />
-            </figure>
+
+            <!-- Live cryptographic data preview -->
+            <div class="interactive-mockup">
+              <div class="mockup-header">
+                <div class="mockup-dot"></div>
+                <div class="mockup-dot"></div>
+                <div class="mockup-dot"></div>
+                <span style="font-size:0.75rem; color:var(--text-muted); font-family:var(--font-mono); margin-left:8px;">stellar-zk-proof-engine</span>
+              </div>
+              <div class="mockup-window">
+                <div class="mockup-row">
+                  <span>[zk-SNARK] Generating proof ...</span>
+                  <span class="mockup-green">OK</span>
+                </div>
+                <div class="mockup-row">
+                  <span>Poseidon Root Hash</span>
+                  <span>0x1ad...4ff</span>
+                </div>
+                <div class="mockup-row">
+                  <span>Witness Constraints</span>
+                  <span>14,282</span>
+                </div>
+                <div class="mockup-row">
+                  <span>Groth16 Verification Key</span>
+                  <span class="mockup-green">Valid</span>
+                </div>
+              </div>
+            </div>
           </div>
 
           <div class="metrics-row" aria-label="Account summary">
-            <article class="metric-card">
+            <article class="panel metric-card">
               <span>Pool liquidity</span>
               <strong>1,000 XLM</strong>
               <small>Fresh testnet deposit confirmed</small>
             </article>
-            <article class="metric-card">
+            <article class="panel metric-card">
               <span>Proof status</span>
               <strong class="status-good">Verified</strong>
               <small>Valid disclosure accepted on-chain</small>
             </article>
-            <article class="metric-card">
+            <article class="panel metric-card">
               <span>Privacy set</span>
               <strong>Association root</strong>
               <small>Root update tx recorded</small>
             </article>
-            <article class="metric-card">
+            <article class="panel metric-card">
               <span>Tamper check</span>
               <strong class="status-bad">Rejected</strong>
               <small>Altered public signals fail</small>
@@ -140,79 +510,99 @@
                   <strong>Selective disclosure</strong>
                 </div>
               </div>
-              <button class="primary full-width" data-view-link="receive" onclick="setView('receive')" type="button">
+              <button class="primary full-width" onclick="setView('receive')" type="button">
                 Review withdrawal
               </button>
             </div>
           </section>
         </section>
 
-        <section class="view" id="send">
-          <div class="section-head wide">
+        <!-- VIEW: Send -->
+        <section class="view" id="send" style="display:none;">
+          <div class="section-head">
             <div>
               <p class="eyebrow">Sender flow</p>
               <h2>Create a private transfer</h2>
             </div>
-            <span class="pill">Demo note generated</span>
+            <span class="pill">Wallet required</span>
           </div>
 
           <div class="transfer-layout">
             <form class="panel form-panel" id="send-form">
-              <label>
-                From
-                <input name="from" value="Alice USD account" />
-              </label>
-              <label>
-                Recipient
-                <input name="recipient" value="Bob INR wallet" />
-              </label>
-              <label>
-                Amount
+              <div class="wallet-gate" id="send-wallet-gate">
+                <div>
+                  <span>Stellar wallet</span>
+                  <strong id="send-wallet-address">Connect Freighter to use your own wallet</strong>
+                </div>
+                <button class="secondary" data-wallet-connect type="button">Connect</button>
+              </div>
+              <div class="form-group">
+                <label for="send-from">From Account</label>
+                <input id="send-from" name="from" value="Connect wallet first" readonly />
+              </div>
+              <div class="form-group">
+                <label for="send-recipient">Recipient Address</label>
+                <input id="send-recipient" name="recipient" value="Bob INR wallet" />
+              </div>
+              <div class="form-group">
+                <label for="send-amount">Amount</label>
                 <div class="amount-row">
-                  <input name="amount" type="number" min="1" value="1000" />
-                  <select name="asset" aria-label="Asset">
+                  <input id="send-amount" name="amount" type="number" min="1" value="1000" />
+                  <select name="asset" aria-label="Asset choice">
                     <option>XLM</option>
                     <option>USDC</option>
                   </select>
                 </div>
-              </label>
-              <label>
-                Purpose
-                <select name="purpose">
+              </div>
+              <div class="form-group">
+                <label for="send-purpose">Purpose</label>
+                <select id="send-purpose" name="purpose">
                   <option>Family support</option>
                   <option>Education</option>
                   <option>Medical</option>
                   <option>Business invoice</option>
                 </select>
-              </label>
-              <label>
-                Privacy note
-                <textarea name="memo">Fresh note opens a commitment already proven on Stellar testnet.</textarea>
-              </label>
-              <button class="primary full-width" type="submit">Generate private transfer</button>
+              </div>
+              <div class="form-group">
+                <label for="send-memo">Privacy note / Context</label>
+                <textarea id="send-memo" name="memo">Fresh note opens a commitment already proven on Stellar testnet.</textarea>
+              </div>
+              <button class="primary full-width" type="submit">Generate Private Transfer</button>
             </form>
 
-            <div class="panel proof-panel">
+            <div class="panel">
               <div class="section-head">
                 <h2>Proof package</h2>
                 <span class="pill" id="proof-pill">Ready</span>
               </div>
-              <div class="proof-steps">
-                <div class="step done">
-                  <strong>Deposit note</strong>
-                  <span>Commitment stored in pool</span>
+              <div class="step-flow">
+                <div class="flow-step done">
+                  <div class="flow-icon">✓</div>
+                  <div class="flow-info">
+                    <strong>Deposit note</strong>
+                    <span>Commitment stored in pool</span>
+                  </div>
                 </div>
-                <div class="step done">
-                  <strong>Association root</strong>
-                  <span>Root accepted by contract admin</span>
+                <div class="flow-step done">
+                  <div class="flow-icon">✓</div>
+                  <div class="flow-info">
+                    <strong>Association root</strong>
+                    <span>Root accepted by contract admin</span>
+                  </div>
                 </div>
-                <div class="step active" id="withdraw-step">
-                  <strong>Withdrawal proof</strong>
-                  <span id="withdraw-copy">Fresh Groth16 proof verified</span>
+                <div class="flow-step active" id="withdraw-step">
+                  <div class="flow-icon">⚙</div>
+                  <div class="flow-info">
+                    <strong>Withdrawal proof</strong>
+                    <span id="withdraw-copy">Fresh Groth16 proof verified</span>
+                  </div>
                 </div>
-                <div class="step" id="receipt-step">
-                  <strong>Disclosure receipt</strong>
-                  <span>Auditor proof package available</span>
+                <div class="flow-step" id="receipt-step">
+                  <div class="flow-icon">?</div>
+                  <div class="flow-info">
+                    <strong>Disclosure receipt</strong>
+                    <span>Auditor proof package available</span>
+                  </div>
                 </div>
               </div>
               <pre><code id="proof-json">{
@@ -224,8 +614,9 @@
           </div>
         </section>
 
-        <section class="view" id="receive">
-          <div class="section-head wide">
+        <!-- VIEW: Receive -->
+        <section class="view" id="receive" style="display:none;">
+          <div class="section-head">
             <div>
               <p class="eyebrow">Recipient flow</p>
               <h2>Withdraw to a recipient wallet</h2>
@@ -269,17 +660,18 @@
             <div class="panel">
               <h2>Privacy checks</h2>
               <div class="check-list">
-                <span>Spent nullifier exists on-chain</span>
-                <span>Merkle root matched pool root</span>
-                <span>Association root matched admin root</span>
-                <span>Duplicate withdrawal blocked</span>
+                <div class="check-item">Spent nullifier exists on-chain</div>
+                <div class="check-item">Merkle root matched pool root</div>
+                <div class="check-item">Association root matched admin root</div>
+                <div class="check-item">Duplicate withdrawal blocked</div>
               </div>
             </div>
           </div>
         </section>
 
-        <section class="view" id="receipts">
-          <div class="section-head wide">
+        <!-- VIEW: Receipts -->
+        <section class="view" id="receipts" style="display:none;">
+          <div class="section-head">
             <div>
               <p class="eyebrow">Auditor flow</p>
               <h2>Selective-disclosure receipt</h2>
@@ -291,29 +683,31 @@
             <div class="panel receipt-card">
               <div class="receipt-header">
                 <div>
-                  <span>Receipt ID</span>
-                  <strong>SETU-DISC-001</strong>
+                  <p class="eyebrow" style="margin:0;">Receipt ID</p>
+                  <h3>SETU-DISC-001</h3>
                 </div>
                 <span class="pill">Verified true</span>
               </div>
-              <dl>
-                <div>
-                  <dt>Disclosed amount</dt>
-                  <dd>1,000 XLM</dd>
-                </div>
-                <div>
-                  <dt>Purpose</dt>
-                  <dd>Family support</dd>
-                </div>
-                <div>
-                  <dt>Recipient tag</dt>
-                  <dd>Bob INR wallet</dd>
-                </div>
-                <div>
-                  <dt>Auditor tag</dt>
-                  <dd>Poseidon(viewingKey, nullifierHash)</dd>
-                </div>
-              </dl>
+              <div class="receipt-body">
+                <dl>
+                  <div>
+                    <dt>Disclosed amount</dt>
+                    <dd>1,000 XLM</dd>
+                  </div>
+                  <div>
+                    <dt>Purpose</dt>
+                    <dd>Family support</dd>
+                  </div>
+                  <div>
+                    <dt>Recipient tag</dt>
+                    <dd>Bob INR wallet</dd>
+                  </div>
+                  <div>
+                    <dt>Auditor tag</dt>
+                    <dd>Poseidon(viewingKey, nullifierHash)</dd>
+                  </div>
+                </dl>
+              </div>
             </div>
 
             <div class="panel">
@@ -331,8 +725,9 @@
           </div>
         </section>
 
-        <section class="view" id="contract">
-          <div class="section-head wide">
+        <!-- VIEW: Contract -->
+        <section class="view" id="contract" style="display:none;">
+          <div class="section-head">
             <div>
               <p class="eyebrow">Live contract</p>
               <h2>Stellar testnet evidence</h2>
@@ -368,42 +763,22 @@
               <span class="pill">Fresh deployment</span>
             </div>
             <div class="tx-list">
-              <a href="https://stellar.expert/explorer/testnet/tx/c9c8ed3e1f6b988b76b29526967195aec4b135dc4bc29ad6fabde0073f701b51" target="_blank" rel="noreferrer">WASM upload</a>
-              <a href="https://stellar.expert/explorer/testnet/tx/3b9a86af7273750b54324c96fb3129a7677f59b7eb288b3c5de6dfe60abb019a" target="_blank" rel="noreferrer">Contract deploy</a>
-              <a href="https://stellar.expert/explorer/testnet/tx/adf901702fea3fcd09e0b8a94d19388d23d7579d05cbe8f7210b30489f9eb458" target="_blank" rel="noreferrer">Deposit</a>
-              <a href="https://stellar.expert/explorer/testnet/tx/709cf0d7530259e33b0af6ba0aa46d811947b1aa71a33f66042e275dfaafa938" target="_blank" rel="noreferrer">Association root</a>
-              <a href="https://stellar.expert/explorer/testnet/tx/6d19b21f5f96ac4237ce85882c81c9d991cd88cfb4859fd59c359b28463cfb9a" target="_blank" rel="noreferrer">Private withdrawal</a>
-              <a href="https://stellar.expert/explorer/testnet/tx/d35c95b0c65ddaedee2b85cd52a5d248571abb36d56c42c3599235ef8d64c6e0" target="_blank" rel="noreferrer">Disclosure VK</a>
+              <a class="tx-link" href="https://stellar.expert/explorer/testnet/tx/c9c8ed3e1f6b988b76b29526967195aec4b135dc4bc29ad6fabde0073f701b51" target="_blank" rel="noreferrer">WASM upload</a>
+              <a class="tx-link" href="https://stellar.expert/explorer/testnet/tx/3b9a86af7273750b54324c96fb3129a7677f59b7eb288b3c5de6dfe60abb019a" target="_blank" rel="noreferrer">Contract deploy</a>
+              <a class="tx-link" href="https://stellar.expert/explorer/testnet/tx/adf901702fea3fcd09e0b8a94d19388d23d7579d05cbe8f7210b30489f9eb458" target="_blank" rel="noreferrer">Deposit</a>
+              <a class="tx-link" href="https://stellar.expert/explorer/testnet/tx/709cf0d7530259e33b0af6ba0aa46d811947b1aa71a33f66042e275dfaafa938" target="_blank" rel="noreferrer">Association root</a>
+              <a class="tx-link" href="https://stellar.expert/explorer/testnet/tx/6d19b21f5f96ac4237ce85882c81c9d991cd88cfb4859fd59c359b28463cfb9a" target="_blank" rel="noreferrer">Private withdrawal</a>
+              <a class="tx-link" href="https://stellar.expert/explorer/testnet/tx/d35c95b0c65ddaedee2b85cd52a5d248571abb36d56c42c3599235ef8d64c6e0" target="_blank" rel="noreferrer">Disclosure VK</a>
             </div>
           </div>
         </section>
       </section>
-    </main>
-
-    <div class="modal-backdrop" id="auth-modal" hidden>
-      <section class="modal" role="dialog" aria-modal="true" aria-labelledby="auth-title">
-        <button class="modal-close" id="auth-close" type="button" aria-label="Close">x</button>
-        <p class="eyebrow" id="auth-mode">Demo access</p>
-        <h2 id="auth-title">Create your Setu account</h2>
-        <form id="auth-form">
-          <label>
-            Name
-            <input name="name" value="Alice Mehta" />
-          </label>
-          <label>
-            Email
-            <input name="email" type="email" value="alice@setu.demo" />
-          </label>
-          <label>
-            Password
-            <input name="password" type="password" value="password" />
-          </label>
-          <button class="primary full-width" id="auth-submit" type="submit">Sign up</button>
-        </form>
-      </section>
     </div>
 
+    <!-- Toast Notification -->
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/stellar-freighter-api/6.0.1/index.min.js"></script>
     <script src="./app.js"></script>
   </body>
 </html>

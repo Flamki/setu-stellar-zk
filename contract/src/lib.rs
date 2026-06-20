@@ -154,14 +154,14 @@ impl PrivacyPoolsContract {
     /// Withdraws funds from the privacy pool using a zero-knowledge proof.
     ///
     /// This function allows a user to withdraw a fixed amount (1 XLM) of the configured token from the privacy pool
-    /// by providing a cryptographic proof that demonstrates ownership of a previously deposited
+    /// by providing a cryptographic proof that proves ownership of a previously deposited
     /// commitment without revealing which specific commitment it corresponds to.
     ///
     /// # Arguments
     ///
     /// * `env` - The Soroban environment
     /// * `to` - The address of the recipient (must be authenticated)
-    /// * `proof_bytes` - The serialized zero-knowledge proof demonstrating ownership of a
+    /// * `proof_bytes` - The serialized zero-knowledge proof proving ownership of a
     ///                   commitment without revealing the commitment itself
     /// * `pub_signals_bytes` - The serialized public signals associated with the proof
     ///

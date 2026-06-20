@@ -3,7 +3,7 @@ pragma circom 2.2.0;
 include "commitment.circom";
 include "comparators.circom";
 
-// This circuit is for withdrawing by demonstrating only that the withdrawer
+// This circuit is for withdrawing by proving only that the withdrawer
 // knows the secret and nullifier, without proving inclusion of the commitment in the Merkle tree.
 // This is for testing purposes only, to enable testing depositing and withdrawing coins prior to 
 // testing the full Merkle tree implementation.

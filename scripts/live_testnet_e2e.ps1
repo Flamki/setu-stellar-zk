@@ -1,6 +1,6 @@
 param(
     [string]$ContractId = "",
-    [string]$Source = "demo_user",
+    [string]$Source = "setu_operator",
     [string]$Network = "testnet",
     [string]$TokenAddress = "CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC",
     [string]$Stellar = "",
@@ -88,26 +88,26 @@ if (-not $ContractId) {
 
 Write-Host "Contract: $ContractId"
 
-cargo run -q --bin stellar-coinutils generate demo_pool -o demo_coin.json
-$coinFile = Get-Content -Raw -LiteralPath demo_coin.json | ConvertFrom-Json
+cargo run -q --bin stellar-coinutils generate setu_pool -o testnet_coin.json
+$coinFile = Get-Content -Raw -LiteralPath testnet_coin.json | ConvertFrom-Json
 $commitmentHex = $coinFile.commitment_hex -replace '^0x', ''
 
 & $Stellar contract invoke --id $ContractId --source $Source --network $Network -- deposit --from $Source --commitment $commitmentHex
 
 $state = [ordered]@{
     commitments = @($coinFile.coin.commitment)
-    scope = "demo_pool"
+    scope = "setu_pool"
 } | ConvertTo-Json -Depth 4
-Set-Content -LiteralPath demo_state.json -Value $state
+Set-Content -LiteralPath testnet_state.json -Value $state
 
-Remove-Item -LiteralPath demo_association.json -ErrorAction SilentlyContinue
-cargo run -q --bin stellar-coinutils update-association demo_association.json $coinFile.coin.label
-$association = Get-Content -Raw -LiteralPath demo_association.json | ConvertFrom-Json
+Remove-Item -LiteralPath testnet_association.json -ErrorAction SilentlyContinue
+cargo run -q --bin stellar-coinutils update-association testnet_association.json $coinFile.coin.label
+$association = Get-Content -Raw -LiteralPath testnet_association.json | ConvertFrom-Json
 $rootHex = node -e "console.log(BigInt(process.argv[1]).toString(16).padStart(64,'0'))" $association.root
 
 & $Stellar contract invoke --id $ContractId --source $Source --network $Network -- set_association_root --caller $Source --association_root $rootHex
 
-cargo run -q --bin stellar-coinutils withdraw demo_coin.json demo_state.json demo_association.json -o withdrawal_input.json
+cargo run -q --bin stellar-coinutils withdraw testnet_coin.json testnet_state.json testnet_association.json -o withdrawal_input.json
 node circuits/build/main_js/generate_witness.js circuits/build/main_js/main.wasm withdrawal_input.json circuits/main.wtns
 node $Snarkjs groth16 prove circuits/output/main_final.zkey circuits/main.wtns circuits/main_proof.json circuits/main_public.json
 

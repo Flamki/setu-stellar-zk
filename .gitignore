@@ -12,7 +12,7 @@ circuits/test/*.wtns
 circuits/test/*.wtns.json
 circuits/*_proof.json
 circuits/*_public.json
-demo_*.json
+testnet_*.json
 withdrawal_input.json
 deploy_output.txt
 setu_contract_id.txt

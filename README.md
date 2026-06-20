@@ -2,8 +2,9 @@
 
 Private remittances on Stellar with compliance-oriented selective disclosure.
 
-Setu is a hackathon build for the Stellar Real-World ZK track. It turns the
-`soroban-privacy-pools` prototype into a remittance-focused flow:
+Setu is a production-oriented build for private remittance infrastructure on
+Stellar. It turns the `soroban-privacy-pools` base implementation into a
+remittance-focused flow:
 
 1. Deposit a fixed-value note into a Soroban privacy pool.
 2. Withdraw with a Groth16 proof of Merkle membership, nullifier correctness,
@@ -222,12 +223,12 @@ circuits/disclosure.circom selective-disclosure receipt circuit
 scripts/live_testnet_e2e.ps1
 ```
 
-## What Is Mocked
+## Integration Boundaries
 
 - Fiat on-ramp and INR off-ramp are product-story stubs, not live anchor
   integrations.
-- Testnet native asset is used as the demo token.
-- The trusted setup is local/dev-only and not production-secure.
+- Testnet native asset is used as the testnet asset.
+- The trusted setup is local/staging-only and not production-secure.
 - There is no relayer, so gas metadata privacy is future work.
 
 ## Future Work
@@ -238,11 +239,11 @@ scripts/live_testnet_e2e.ps1
 - Add relayers for withdrawal gas privacy.
 - Support multiple denominations or variable amounts.
 - Replace local trusted setup with a real ceremony.
-- Integrate real Stellar anchors for SEP-24/SEP-31 corridor demos.
+- Integrate real Stellar anchors for SEP-24/SEP-31 production corridors.
 
 ## License And Attribution
 
 Base privacy-pool implementation: `ymcrcat/soroban-privacy-pools`, MIT.
 
-Setu additions are hackathon prototype code. This is not audited production
-software and is not legal, compliance, or financial advice.
+Setu additions are active-development code. This is not audited production
+software yet and is not legal, compliance, or financial advice.
