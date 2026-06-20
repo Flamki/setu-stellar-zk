@@ -1172,11 +1172,11 @@ textarea {
   align-items: center;
   justify-content: space-between;
   height: 90px;
-  border-bottom: 1px solid var(--border-color);
+  border-bottom: 1px solid transparent;
   position: sticky;
   top: 0;
-  background: rgba(0, 0, 0, 0.5);
-  backdrop-filter: blur(12px);
+  background: transparent;
+  backdrop-filter: none;
   z-index: 1000;
 }
 
