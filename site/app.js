@@ -15,6 +15,11 @@ const authStepOne = document.getElementById("auth-step-one");
 // Auth Panels
 const loginCard = document.getElementById("login-card");
 const signupCard = document.getElementById("signup-card");
+const authStatusNodes = document.querySelectorAll("[data-auth-status]");
+const authProviderButtons = document.querySelectorAll("[data-auth-provider]");
+const authFormControls = document.querySelectorAll(
+  "#login-form input, #login-form button, #signup-form input, #signup-form button, [data-auth-provider], #reset-password",
+);
 
 // Simulator Elements
 const simForm = document.getElementById("sim-form");
@@ -37,6 +42,11 @@ const sendWalletAddress = document.getElementById("send-wallet-address");
 // State variables
 let currentUser = null;
 let currentWallet = null;
+let authInitialized = false;
+let authSession = null;
+
+const supabaseConfig = window.SETU_SUPABASE_CONFIG || {};
+const authClient = createAuthClient();
 
 const activities = [
   {
@@ -62,6 +72,181 @@ function showToast(message) {
   toast.classList.add("show");
   window.clearTimeout(showToast.timer);
   showToast.timer = window.setTimeout(() => toast.classList.remove("show"), 2600);
+}
+
+function createAuthClient() {
+  const hasConfig = Boolean(
+    supabaseConfig.enabled &&
+    supabaseConfig.url &&
+    supabaseConfig.anonKey,
+  );
+
+  if (!hasConfig || !window.supabase || typeof window.supabase.createClient !== "function") {
+    return null;
+  }
+
+  return window.supabase.createClient(supabaseConfig.url, supabaseConfig.anonKey, {
+    auth: {
+      autoRefreshToken: true,
+      detectSessionInUrl: true,
+      persistSession: true,
+    },
+  });
+}
+
+function getAuthRedirect(hash = "#dashboard") {
+  const url = new URL(window.location.href);
+  url.hash = hash;
+  return url.toString();
+}
+
+function setAuthStatus(message = "", type = "info") {
+  authStatusNodes.forEach((node) => {
+    node.textContent = message;
+    node.hidden = !message;
+    node.classList.toggle("success", type === "success");
+    node.classList.toggle("error", type === "error");
+  });
+}
+
+function setAuthControlsEnabled(enabled) {
+  authFormControls.forEach((control) => {
+    control.disabled = !enabled;
+  });
+}
+
+function setButtonBusy(button, busy, label) {
+  if (!button) return;
+  if (!button.dataset.readyLabel) {
+    button.dataset.readyLabel = button.textContent;
+  }
+
+  button.disabled = busy;
+  button.textContent = busy ? label : button.dataset.readyLabel;
+}
+
+function renderAuthAvailability() {
+  if (authClient) {
+    setAuthControlsEnabled(true);
+    setAuthStatus("");
+    return;
+  }
+
+  setAuthControlsEnabled(false);
+  setAuthStatus(
+    "Authentication is not configured on this deployment. Add SETU_SUPABASE_URL and SETU_SUPABASE_ANON_KEY in Vercel, then redeploy.",
+    "error",
+  );
+}
+
+function formatAuthError(error) {
+  if (!error) return "Authentication request failed.";
+  return error.message || "Authentication request failed.";
+}
+
+function getDisplayNameFromUser(user) {
+  const metadata = user.user_metadata || {};
+  const fullName = metadata.full_name || metadata.name || "";
+  const firstLast = [metadata.first_name, metadata.last_name].filter(Boolean).join(" ");
+  const fromEmail = (user.email || "").split("@")[0] || "Setu operator";
+
+  return fullName || firstLast || fromEmail;
+}
+
+function userFromSession(session) {
+  if (!session || !session.user) return null;
+  const user = session.user;
+
+  return {
+    id: user.id,
+    name: getDisplayNameFromUser(user),
+    email: user.email || "",
+    role: user.user_metadata?.role || "operator",
+  };
+}
+
+async function hydrateAuthenticatedUser(session) {
+  authSession = session || null;
+  currentUser = userFromSession(session);
+  updateProfileUI();
+
+  if (!authClient || !currentUser) return;
+
+  try {
+    const { data, error } = await authClient
+      .from("profiles")
+      .select("email, full_name, first_name, last_name, role")
+      .eq("id", currentUser.id)
+      .maybeSingle();
+
+    if (error || !data) return;
+
+    const profileName = data.full_name || [data.first_name, data.last_name].filter(Boolean).join(" ");
+    currentUser = {
+      ...currentUser,
+      name: profileName || currentUser.name,
+      email: data.email || currentUser.email,
+      role: data.role || currentUser.role,
+    };
+    updateProfileUI();
+  } catch {
+    // Auth remains valid even if the optional profile hydration endpoint is unavailable.
+  }
+}
+
+async function upsertProfile(profile) {
+  if (!authClient || !authSession?.user) return;
+
+  await authClient.from("profiles").upsert({
+    id: authSession.user.id,
+    email: profile.email,
+    full_name: profile.name,
+    first_name: profile.firstName,
+    last_name: profile.lastName,
+    role: "operator",
+  });
+}
+
+async function initAuth() {
+  localStorage.removeItem("setu_user");
+  renderAuthAvailability();
+
+  if (!authClient) {
+    authInitialized = true;
+    updateProfileUI();
+    handleRouting();
+    renderActivities();
+    return;
+  }
+
+  const { data, error } = await authClient.auth.getSession();
+  if (error) {
+    setAuthStatus(formatAuthError(error), "error");
+  }
+
+  authInitialized = true;
+  await hydrateAuthenticatedUser(data?.session || null);
+
+  authClient.auth.onAuthStateChange((event, session) => {
+    void (async () => {
+      await hydrateAuthenticatedUser(session);
+
+      if (event === "SIGNED_IN" && (window.location.hash === "#login" || window.location.hash === "#signup")) {
+        window.location.hash = "#dashboard";
+        return;
+      }
+
+      if (event === "SIGNED_OUT") {
+        setWalletUi(null);
+        localStorage.removeItem("setu_wallet");
+      }
+
+      handleRouting();
+    })();
+  });
+
+  handleRouting();
+  renderActivities();
 }
 
 function shortenAddress(address) {
@@ -288,19 +473,6 @@ function triggerConfetti() {
 // Routing & View Manager
 function handleRouting() {
   const hash = window.location.hash || "#home";
-
-  // Load session from localStorage if exists
-  if (!currentUser) {
-    const savedUser = localStorage.getItem("setu_user");
-    if (savedUser) {
-      try {
-        currentUser = JSON.parse(savedUser);
-        updateProfileUI();
-      } catch {
-        localStorage.removeItem("setu_user");
-      }
-    }
-  }
   loadSavedWallet();
 
   // Route groupings
@@ -330,8 +502,13 @@ function handleRouting() {
     }
   } else {
     // Dashboard views
+    if (!authInitialized) return;
+
     if (!currentUser) {
-      showToast("Please log in to access the desk.");
+      if (!authClient) {
+        renderAuthAvailability();
+      }
+      showToast("Sign in to access the desk.");
       window.location.hash = "#login";
       return;
     }
@@ -386,47 +563,160 @@ function updateProfileUI() {
     profileName.textContent = currentUser.name;
     profileEmail.textContent = currentUser.email;
   } else {
-    profileName.textContent = "Guest account";
-    profileEmail.textContent = "guest@setu.example";
+    profileName.textContent = "Not signed in";
+    profileEmail.textContent = "Authentication required";
   }
 }
 
 // Auth Logic: Register User
-function registerUser(name, email) {
-  currentUser = { name, email };
-  localStorage.setItem("setu_user", JSON.stringify(currentUser));
-  updateProfileUI();
-  showToast("Account created successfully!");
-  triggerConfetti();
-  window.location.hash = "#dashboard";
+async function registerUser({ name, email, password, firstName, lastName }, submitButton) {
+  if (!authClient) {
+    renderAuthAvailability();
+    return;
+  }
+
+  setButtonBusy(submitButton, true, "Creating account...");
+  setAuthStatus("");
+
+  try {
+    const { data, error } = await authClient.auth.signUp({
+      email,
+      password,
+      options: {
+        data: {
+          full_name: name,
+          first_name: firstName,
+          last_name: lastName,
+          role: "operator",
+        },
+        emailRedirectTo: getAuthRedirect("#dashboard"),
+      },
+    });
+
+    if (error) throw error;
+
+    if (data.session) {
+      authSession = data.session;
+      await hydrateAuthenticatedUser(data.session);
+      await upsertProfile({ name, email, firstName, lastName });
+      setAuthStatus("Account created and signed in.", "success");
+      showToast("Account created.");
+      triggerConfetti();
+      window.location.hash = "#dashboard";
+      return;
+    }
+
+    setAuthStatus("Account created. Check your email to confirm access, then sign in.", "success");
+    showToast("Check your email to confirm access.");
+    window.location.hash = "#login";
+  } catch (error) {
+    setAuthStatus(formatAuthError(error), "error");
+    showToast(formatAuthError(error));
+  } finally {
+    setButtonBusy(submitButton, false);
+  }
 }
 
 // Auth Logic: Login User
-function loginUser(email) {
-  const handle = email.split("@")[0] || "alice";
-  const name = handle
-    .split(/[._-]/)
-    .filter(Boolean)
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(" ") || "Alice Mehta";
+async function loginUser(email, password, submitButton) {
+  if (!authClient) {
+    renderAuthAvailability();
+    return;
+  }
 
-  currentUser = { name, email };
-  localStorage.setItem("setu_user", JSON.stringify(currentUser));
-  updateProfileUI();
-  showToast("Successfully logged in.");
-  triggerConfetti();
-  window.location.hash = "#dashboard";
+  setButtonBusy(submitButton, true, "Signing in...");
+  setAuthStatus("");
+
+  try {
+    const { data, error } = await authClient.auth.signInWithPassword({ email, password });
+    if (error) throw error;
+
+    await hydrateAuthenticatedUser(data.session);
+    setAuthStatus("Signed in securely.", "success");
+    showToast("Signed in.");
+    triggerConfetti();
+    window.location.hash = "#dashboard";
+  } catch (error) {
+    setAuthStatus(formatAuthError(error), "error");
+    showToast(formatAuthError(error));
+  } finally {
+    setButtonBusy(submitButton, false);
+  }
+}
+
+async function signInWithProvider(provider, button) {
+  if (!authClient) {
+    renderAuthAvailability();
+    return;
+  }
+
+  setButtonBusy(button, true, "Redirecting...");
+  setAuthStatus("");
+
+  try {
+    const { error } = await authClient.auth.signInWithOAuth({
+      provider,
+      options: {
+        redirectTo: getAuthRedirect("#dashboard"),
+      },
+    });
+
+    if (error) throw error;
+  } catch (error) {
+    setButtonBusy(button, false);
+    setAuthStatus(formatAuthError(error), "error");
+    showToast(formatAuthError(error));
+  }
+}
+
+async function sendPasswordReset(email, button) {
+  if (!authClient) {
+    renderAuthAvailability();
+    return;
+  }
+
+  if (!email) {
+    setAuthStatus("Enter your email address first, then request a password reset.", "error");
+    return;
+  }
+
+  setButtonBusy(button, true, "Sending...");
+  setAuthStatus("");
+
+  try {
+    const { error } = await authClient.auth.resetPasswordForEmail(email, {
+      redirectTo: getAuthRedirect("#login"),
+    });
+
+    if (error) throw error;
+
+    setAuthStatus("Password reset email sent.", "success");
+    showToast("Password reset email sent.");
+  } catch (error) {
+    setAuthStatus(formatAuthError(error), "error");
+    showToast(formatAuthError(error));
+  } finally {
+    setButtonBusy(button, false);
+  }
 }
 
 // Auth Logic: Log Out
-function logout() {
+async function logout() {
+  if (authClient && authSession) {
+    const { error } = await authClient.auth.signOut();
+    if (error) {
+      showToast(formatAuthError(error));
+      return;
+    }
+  }
+
   currentUser = null;
+  authSession = null;
   currentWallet = null;
-  localStorage.removeItem("setu_user");
   localStorage.removeItem("setu_wallet");
   updateProfileUI();
   setWalletUi(null);
-  showToast("Logged out successfully.");
+  showToast("Signed out.");
   window.location.hash = "#home";
 }
 
@@ -483,7 +773,7 @@ function runZKSimulator(event) {
   setTimeout(() => {
     document.getElementById("step-deposit").className = "sim-step active";
     consoleLog(`[Poseidon] Generating secret note commitment parameters...`);
-    consoleLog(`[Poseidon] secret: 0x${Array.from({length:32}, () => Math.floor(Math.random()*16).toString(16)).join("")}`);
+    consoleLog("[Poseidon] note opening derived client-side: [redacted]");
     consoleLog(`[Poseidon] nullifier: 0x4acc5489ab80200caae1eca0b44dd2335e92931ff51e358e4fc7381378367816`);
     consoleLog(`[Poseidon] Note Commitment: C = 0x8df1c3f29bda79857...`);
   }, 100);
@@ -535,8 +825,7 @@ function resetZKSimulator() {
 // Event Listeners
 window.addEventListener("hashchange", handleRouting);
 window.addEventListener("load", () => {
-  handleRouting();
-  renderActivities();
+  void initAuth();
 });
 
 // ZK Simulator trigger
@@ -559,14 +848,26 @@ document.getElementById("signup-form").addEventListener("submit", (e) => {
   const firstName = document.getElementById("signup-first").value.trim();
   const lastName = document.getElementById("signup-last").value.trim();
   const name = [firstName, lastName].filter(Boolean).join(" ") || document.getElementById("signup-name").value;
-  const email = document.getElementById("signup-email").value;
-  registerUser(name, email);
+  const email = document.getElementById("signup-email").value.trim();
+  const password = document.getElementById("signup-password").value;
+
+  void registerUser(
+    {
+      name,
+      email,
+      password,
+      firstName,
+      lastName,
+    },
+    e.submitter,
+  );
 });
 
 document.getElementById("login-form").addEventListener("submit", (e) => {
   e.preventDefault();
-  const email = document.getElementById("login-email").value;
-  loginUser(email);
+  const email = document.getElementById("login-email").value.trim();
+  const password = document.getElementById("login-password").value;
+  void loginUser(email, password, e.submitter);
 });
 
 // Auth View switches
@@ -576,11 +877,10 @@ document.getElementById("to-signup").addEventListener("click", () => {
 document.getElementById("to-login").addEventListener("click", () => {
   window.location.hash = "#login";
 });
-document.getElementById("login-bypass").addEventListener("click", () => {
-  loginUser("alice@setu.example");
-});
-document.getElementById("signup-bypass").addEventListener("click", () => {
-  registerUser("Alice Mehta", "alice@setu.example");
+
+document.getElementById("reset-password").addEventListener("click", (event) => {
+  const email = document.getElementById("login-email").value.trim();
+  void sendPasswordReset(email, event.currentTarget);
 });
 
 document.querySelectorAll("[data-password-toggle]").forEach((button) => {
@@ -594,20 +894,15 @@ document.querySelectorAll("[data-password-toggle]").forEach((button) => {
   });
 });
 
-document.querySelectorAll("[data-login-shortcut]").forEach((button) => {
-  button.addEventListener("click", () => loginUser(button.dataset.loginShortcut));
-});
-
-document.querySelectorAll("[data-signup-shortcut]").forEach((button) => {
+authProviderButtons.forEach((button) => {
   button.addEventListener("click", () => {
-    const [name, email] = button.dataset.signupShortcut.split("|");
-    registerUser(name, email);
+    void signInWithProvider(button.dataset.authProvider, button);
   });
 });
 
 // Log out handlers
-document.getElementById("logout-button").addEventListener("click", logout);
-document.getElementById("logout-top").addEventListener("click", logout);
+document.getElementById("logout-button").addEventListener("click", () => void logout());
+document.getElementById("logout-top").addEventListener("click", () => void logout());
 
 // Send Form Submission
 document.getElementById("send-form").addEventListener("submit", (event) => {

@@ -236,12 +236,13 @@
             <h2>Sign in</h2>
             <p>Welcome back. Access your private remittance desk.</p>
           </div>
+          <div class="auth-status" data-auth-status hidden></div>
           <div class="social-btn-row">
-            <button class="social-btn" type="button" data-login-shortcut="alice@setu.example">
+            <button class="social-btn" type="button" data-auth-provider="google">
               <span aria-hidden="true">G</span>
               Google
             </button>
-            <button class="social-btn" type="button" data-login-shortcut="auditor@setu.example">
+            <button class="social-btn" type="button" data-auth-provider="github">
               <span aria-hidden="true">GH</span>
               GitHub
             </button>
@@ -252,15 +253,15 @@
           <form id="login-form" class="auth-form">
             <div class="form-group">
               <label for="login-email">Email address</label>
-              <input id="login-email" type="email" value="alice@setu.example" autocomplete="email" required />
+              <input id="login-email" name="email" type="email" autocomplete="email" required />
             </div>
             <div class="form-group">
               <div class="label-row">
                 <label for="login-password">Password</label>
-                <a href="#signup">Need access?</a>
+                <button id="reset-password" type="button">Reset password</button>
               </div>
               <div class="password-wrapper">
-                <input id="login-password" type="password" value="password" autocomplete="current-password" required />
+                <input id="login-password" name="password" type="password" autocomplete="current-password" required />
                 <button class="eye-btn" type="button" data-password-toggle="login-password" aria-label="Show password">
                   <svg viewBox="0 0 24 24" aria-hidden="true">
                     <path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z"></path>
@@ -270,7 +271,6 @@
               </div>
             </div>
             <button class="primary full-width auth-submit" type="submit">Sign in</button>
-            <button class="secondary full-width auth-shortcut" id="login-bypass" type="button">Open staging workspace</button>
           </form>
           <p class="auth-switch-text">
             New to Setu? <button id="to-signup" type="button">Create account</button>
@@ -286,12 +286,13 @@
             <h2>Create account</h2>
             <p>Start with a compliant privacy-pool workspace on Stellar.</p>
           </div>
+          <div class="auth-status" data-auth-status hidden></div>
           <div class="social-btn-row">
-            <button class="social-btn" type="button" data-signup-shortcut="Alice Mehta|alice@setu.example">
+            <button class="social-btn" type="button" data-auth-provider="google">
               <span aria-hidden="true">G</span>
               Google
             </button>
-            <button class="social-btn" type="button" data-signup-shortcut="Audit Lead|auditor@setu.example">
+            <button class="social-btn" type="button" data-auth-provider="github">
               <span aria-hidden="true">GH</span>
               GitHub
             </button>
@@ -303,22 +304,22 @@
             <div class="auth-name-grid">
               <div class="form-group">
                 <label for="signup-first">First name</label>
-                <input id="signup-first" type="text" value="Alice" autocomplete="given-name" required />
+                <input id="signup-first" name="firstName" type="text" autocomplete="given-name" required />
               </div>
               <div class="form-group">
                 <label for="signup-last">Last name</label>
-                <input id="signup-last" type="text" value="Mehta" autocomplete="family-name" required />
+                <input id="signup-last" name="lastName" type="text" autocomplete="family-name" required />
               </div>
             </div>
-            <input id="signup-name" type="hidden" value="Alice Mehta" />
+            <input id="signup-name" type="hidden" />
             <div class="form-group">
               <label for="signup-email">Email address</label>
-              <input id="signup-email" type="email" value="alice@setu.example" autocomplete="email" required />
+              <input id="signup-email" name="email" type="email" autocomplete="email" required />
             </div>
             <div class="form-group">
               <label for="signup-password">Password</label>
               <div class="password-wrapper">
-                <input id="signup-password" type="password" value="password" autocomplete="new-password" required />
+                <input id="signup-password" name="password" type="password" autocomplete="new-password" minlength="8" required />
                 <button class="eye-btn" type="button" data-password-toggle="signup-password" aria-label="Show password">
                   <svg viewBox="0 0 24 24" aria-hidden="true">
                     <path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z"></path>
@@ -329,7 +330,6 @@
               <p class="field-hint">Use 8 or more characters for production accounts.</p>
             </div>
             <button class="primary full-width auth-submit" type="submit">Create account</button>
-            <button class="secondary full-width auth-shortcut" id="signup-bypass" type="button">Open staging workspace</button>
           </form>
           <p class="auth-switch-text">
             Already have an account? <button id="to-login" type="button">Sign in</button>
@@ -369,8 +369,8 @@
 
         <section class="identity-panel" aria-label="Account profile">
           <p class="eyebrow" style="margin-bottom:4px;">Signed in as</p>
-          <strong id="profile-name">Guest account</strong>
-          <span id="profile-email">guest@setu.example</span>
+          <strong id="profile-name">Not signed in</strong>
+          <span id="profile-email">Not signed in</span>
           <button class="secondary full-width" id="wallet-button" type="button">
             Connect wallet
           </button>
@@ -782,6 +782,8 @@
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/stellar-freighter-api/6.0.1/index.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="./auth-config.js"></script>
     <script src="./app.js"></script>
   </body>
 </html>

@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
+    "build": "node build-config.cjs",
     "dev": "node server.cjs",
     "start": "npx serve .",
     "deploy": "npx vercel --prod"

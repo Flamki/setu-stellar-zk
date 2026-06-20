@@ -34,6 +34,21 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  if (target === "/auth-config.js" && !fs.existsSync(filePath)) {
+    const authConfig = {
+      enabled: Boolean(process.env.SETU_SUPABASE_URL && process.env.SETU_SUPABASE_ANON_KEY),
+      url: process.env.SETU_SUPABASE_URL || "",
+      anonKey: process.env.SETU_SUPABASE_ANON_KEY || "",
+    };
+    send(
+      res,
+      200,
+      `window.SETU_SUPABASE_CONFIG = ${JSON.stringify(authConfig, null, 2)};\n`,
+      "text/javascript; charset=utf-8",
+    );
+    return;
+  }
+
   fs.readFile(filePath, (error, data) => {
     if (error) {
       send(res, 404, "Not found");

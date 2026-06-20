@@ -437,8 +437,25 @@ textarea {
   margin-top: 4px;
 }
 
-.auth-shortcut {
-  margin-top: -4px;
+.auth-status {
+  border: 1px solid rgba(245, 158, 11, 0.28);
+  border-radius: 8px;
+  background: rgba(245, 158, 11, 0.08);
+  color: rgba(255, 255, 255, 0.82);
+  font-family: var(--font-sans);
+  font-size: 0.84rem;
+  line-height: 1.5;
+  padding: 12px 14px;
+}
+
+.auth-status.success {
+  border-color: rgba(16, 185, 129, 0.28);
+  background: rgba(16, 185, 129, 0.08);
+}
+
+.auth-status.error {
+  border-color: rgba(239, 68, 68, 0.3);
+  background: rgba(239, 68, 68, 0.08);
 }
 
 .auth-switch-text {
@@ -449,7 +466,8 @@ textarea {
 }
 
 .auth-switch-text button,
-.label-row a {
+.label-row a,
+.label-row button {
   border: 0;
   padding: 0;
   background: transparent;
@@ -460,7 +478,8 @@ textarea {
 }
 
 .auth-switch-text button:hover,
-.label-row a:hover {
+.label-row a:hover,
+.label-row button:hover {
   text-decoration: underline;
 }
 

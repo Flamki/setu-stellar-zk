@@ -210,6 +210,49 @@ contract:
   -ContractId CDXLQFYQJVDXBZDI5QVYRAM5TGPMZQWS424FCQWYVNGSKSSHPU6XXAXT
 ```
 
+## Authentication
+
+The web app uses Supabase Auth for production sign up, sign in, OAuth redirect,
+password reset, session persistence, and sign out. Browser code only receives
+the Supabase URL and anon/publishable key. Do not use or expose a service-role
+key in `site/`.
+
+Create a Supabase project, enable Email auth, and enable Google/GitHub providers
+only after their OAuth client IDs and redirect URLs are configured in Supabase.
+Apply the profile table and RLS migration:
+
+```powershell
+# Option A: Supabase SQL editor
+# Paste supabase/migrations/20260620150000_create_profiles.sql and run it.
+
+# Option B: Supabase CLI, after installing and logging in
+supabase link --project-ref <project-ref>
+supabase db push
+```
+
+Configure deployment variables:
+
+```text
+SETU_SUPABASE_URL=https://<project-ref>.supabase.co
+SETU_SUPABASE_ANON_KEY=<anon-or-publishable-key>
+```
+
+For local static testing, either set those variables before running the site or
+copy `site/auth-config.example.js` to `site/auth-config.js` and replace the
+placeholder values. `site/auth-config.js` is ignored so real deployment config
+does not get committed.
+
+```powershell
+cd site
+$env:SETU_SUPABASE_URL="https://<project-ref>.supabase.co"
+$env:SETU_SUPABASE_ANON_KEY="<anon-or-publishable-key>"
+npm run build
+npm run dev
+```
+
+If the variables are missing, the auth forms stay disabled and the page shows a
+configuration warning instead of opening an unauthenticated workspace.
+
 ## Project Structure
 
 ```text
@@ -221,12 +264,17 @@ cli/coinutils/             note generation and witness input generation
 circuits/main.circom       withdrawal proof circuit
 circuits/disclosure.circom selective-disclosure receipt circuit
 scripts/live_testnet_e2e.ps1
+site/                      Supabase-authenticated web app
+supabase/migrations/       Profiles table, trigger, and RLS policies
 ```
 
 ## Integration Boundaries
 
 - Fiat on-ramp and INR off-ramp are product-story stubs, not live anchor
   integrations.
+- Supabase Auth is wired for real accounts, but a live Supabase project and
+  deployment environment variables must be configured before public sign in is
+  enabled.
 - Testnet native asset is used as the testnet asset.
 - The trusted setup is local/staging-only and not production-secure.
 - There is no relayer, so gas metadata privacy is future work.
