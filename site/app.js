@@ -484,20 +484,20 @@ function handleRouting() {
   } else if (hash === "#login" || hash === "#signup") {
     // Show Auth View
     landingPage.style.display = "none";
-    authPage.style.display = "grid";
+    authPage.style.display = "flex";
     appWorkspace.style.display = "none";
 
     if (hash === "#login") {
       loginCard.style.display = "block";
       signupCard.style.display = "none";
-      authStoryTitle.textContent = "Welcome back to Setu";
-      authStoryCopy.textContent = "Continue from a verified Stellar testnet flow with private withdrawals, disclosure receipts, and tamper-resistant audit evidence in one workspace.";
-      authStepOne.textContent = "Enter secure credentials";
+      authStoryTitle.textContent = "Welcome back";
+      authStoryCopy.textContent = "Follow these 3 quick phases to access your private remittance space.";
+      authStepOne.textContent = "Verify your identity";
     } else {
       loginCard.style.display = "none";
       signupCard.style.display = "block";
-      authStoryTitle.textContent = "Join the Setu workspace";
-      authStoryCopy.textContent = "Create a remittance desk for privacy-preserving transfers, ZK proof generation, and auditor-ready disclosure packages.";
+      authStoryTitle.textContent = "Join Setu";
+      authStoryCopy.textContent = "Follow these 3 quick phases to activate your private remittance space.";
       authStepOne.textContent = "Register your identity";
     }
   } else {
@@ -974,4 +974,155 @@ document.getElementById("copy-receipt").addEventListener("click", async () => {
   } catch {
     showToast("Receipt ready to copy");
   }
+});
+
+// Interactive Spotlight tracking
+window.addEventListener("mousemove", (e) => {
+  const spotlight = document.getElementById("mouse-spotlight");
+  if (spotlight) {
+    spotlight.style.setProperty("--mouse-x", `${e.clientX}px`);
+    spotlight.style.setProperty("--mouse-y", `${e.clientY}px`);
+    spotlight.style.opacity = "0.75";
+  }
+});
+
+document.addEventListener("mouseleave", () => {
+  const spotlight = document.getElementById("mouse-spotlight");
+  if (spotlight) {
+    spotlight.style.opacity = "0";
+  }
+});
+
+// Ambient Liquid WebGL Shader for Footer
+function initFooterShader() {
+  const canvas = document.getElementById("footer-shader-canvas");
+  if (!canvas) return;
+
+  const gl = canvas.getContext("webgl") || canvas.getContext("experimental-webgl");
+  if (!gl) return;
+
+  // Vertex shader: Full-screen quad
+  const vsSource = `
+    attribute vec2 position;
+    void main() {
+      gl_Position = vec4(position, 0.0, 1.0);
+    }
+  `;
+
+  // Fragment shader: Fluid ambient plasma in green/amber/cyan matching the theme
+  const fsSource = `
+    precision mediump float;
+    uniform float u_time;
+    uniform vec2 u_resolution;
+
+    void main() {
+      vec2 uv = gl_FragCoord.xy / u_resolution.xy;
+      vec2 p = uv - 0.5;
+      p.x *= u_resolution.x / u_resolution.y;
+
+      // Morphing waves
+      float wave1 = sin(p.x * 2.2 + u_time * 0.7) * 0.18;
+      float wave2 = cos(p.y * 1.8 - u_time * 0.5) * 0.12;
+
+      float dist1 = abs(p.y - wave1);
+      float dist2 = abs(p.x - wave2);
+
+      float glow1 = 0.015 / (dist1 + 0.08);
+      float glow2 = 0.015 / (dist2 + 0.08);
+
+      // Colors: Amber (#f59e0b), Emerald (#10b981), and Cyan (#06b6d4)
+      vec3 col1 = vec3(0.96, 0.62, 0.04);
+      vec3 col2 = vec3(0.06, 0.73, 0.51);
+      vec3 col3 = vec3(0.02, 0.71, 0.83);
+
+      vec3 finalCol = mix(col1, col2, uv.x) * glow1;
+      finalCol += mix(col2, col3, uv.y) * glow2;
+
+      // Pulse overlay
+      finalCol *= 0.7 + 0.25 * sin(u_time * 0.4);
+
+      // Bottom black overlay
+      finalCol += vec3(0.003, 0.006, 0.01) * (1.0 - uv.y);
+
+      gl_FragColor = vec4(finalCol, 1.0);
+    }
+  `;
+
+  function compileShader(source, type) {
+    const shader = gl.createShader(type);
+    gl.shaderSource(shader, source);
+    gl.compileShader(shader);
+    if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+      console.error(gl.getShaderInfoLog(shader));
+      gl.deleteShader(shader);
+      return null;
+    }
+    return shader;
+  }
+
+  const vs = compileShader(vsSource, gl.VERTEX_SHADER);
+  const fs = compileShader(fsSource, gl.FRAGMENT_SHADER);
+  if (!vs || !fs) return;
+
+  const program = gl.createProgram();
+  gl.attachShader(program, vs);
+  gl.attachShader(program, fs);
+  gl.linkProgram(program);
+
+  if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+    console.error(gl.getProgramInfoLog(program));
+    return;
+  }
+
+  const positionBuffer = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+  gl.bufferData(
+    gl.ARRAY_BUFFER,
+    new Float32Array([
+      -1, -1,
+       1, -1,
+      -1,  1,
+      -1,  1,
+       1, -1,
+       1,  1,
+    ]),
+    gl.STATIC_DRAW
+  );
+
+  const positionLoc = gl.getAttribLocation(program, "position");
+  const timeLoc = gl.getUniformLocation(program, "u_time");
+  const resLoc = gl.getUniformLocation(program, "u_resolution");
+
+  function resize() {
+    const width = canvas.clientWidth;
+    const height = canvas.clientHeight;
+    if (canvas.width !== width || canvas.height !== height) {
+      canvas.width = width;
+      canvas.height = height;
+      gl.viewport(0, 0, width, height);
+    }
+  }
+
+  function render(time) {
+    resize();
+    gl.clear(gl.COLOR_BUFFER_BIT);
+
+    gl.useProgram(program);
+    gl.enableVertexAttribArray(positionLoc);
+    gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+    gl.vertexAttribPointer(positionLoc, 2, gl.FLOAT, false, 0, 0);
+
+    gl.uniform1f(timeLoc, time * 0.001);
+    gl.uniform2f(resLoc, canvas.width, canvas.height);
+
+    gl.drawArrays(gl.TRIANGLES, 0, 6);
+    requestAnimationFrame(render);
+  }
+
+  requestAnimationFrame(render);
+}
+
+// Initialise on load
+window.addEventListener("DOMContentLoaded", () => {
+  initFooterShader();
 });

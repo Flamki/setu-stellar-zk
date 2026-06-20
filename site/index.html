@@ -15,6 +15,12 @@
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
+    <!-- Cyber Grid Background and Mouse Spotlight Spotlight -->
+    <div class="grid-bg-container">
+      <div class="cyber-grid"></div>
+      <div class="mouse-spotlight" id="mouse-spotlight"></div>
+    </div>
+
     <!-- 1. LANDING PAGE VIEW -->
     <div id="landing-page" class="landing-view">
       <header class="landing-header">
@@ -36,8 +42,11 @@
 
       <section class="landing-hero" id="home">
         <div class="hero-text">
-          <p class="eyebrow">Private remittance on Stellar</p>
-          <h1>Move money like a bridge. Prove it like a bank.</h1>
+          <p class="eyebrow">
+            <span style="display:inline-block; width:6px; height:6px; border-radius:50%; background:var(--color-amber); animation: pulse-core 1.5s infinite alternate;"></span>
+            Private remittance on Stellar
+          </p>
+          <h1>Move money like a <span class="gradient-text">bridge</span>. Prove it like a <span class="gradient-text">bank</span>.</h1>
           <p>
             Private USDC moves through a ZK pool. Receipts prove corridor facts without exposing the funding wallet.
           </p>
@@ -67,122 +76,171 @@
         </div>
 
         <div class="hero-product-stack">
-          <div class="corridor-card" aria-label="Private remittance route preview">
-            <div class="corridor-map">
-              <div class="corridor-party">
-                <span>Sender</span>
-                <strong>USDC</strong>
-                <small>Wallet A</small>
+          <!-- ZK Simulator Widget inside a Terminal Window -->
+          <div class="beam-panel sim-card float-element" id="simulator">
+            <div class="terminal-header">
+              <div class="terminal-dots">
+                <span></span>
+                <span></span>
+                <span></span>
               </div>
-              <div class="corridor-rail">
-                <i></i>
-                <span>Setu pool</span>
-              </div>
-              <div class="corridor-party receiver">
-                <span>Receiver</span>
-                <strong>INR</strong>
-                <small>Wallet B</small>
-              </div>
+              <span class="terminal-title">setu-zk-proof-engine</span>
+              <div></div>
             </div>
-            <div class="receipt-chip">
-              <span class="brand-mark" aria-hidden="true"></span>
-              <div>
-                <strong>Selective disclosure ready</strong>
-                <small>Verify amount and purpose without exposing the source wallet.</small>
+
+            <div class="sim-body-wrap">
+              <div class="sim-header">
+                <div>
+                  <p class="eyebrow" style="margin: 0; font-size: 0.65rem; letter-spacing: 0.05em; text-transform: uppercase;">Compliance-ready ZK</p>
+                  <h3>ZK-SNARK Simulator</h3>
+                </div>
+                <span class="pill" id="sim-status">Idle</span>
+              </div>
+
+              <!-- Simulator Input Form -->
+              <form id="sim-form" class="sim-form">
+                <div class="form-group">
+                  <label for="sim-amount">Amount (USDC equivalent)</label>
+                  <div class="amount-row">
+                    <input id="sim-amount" type="number" min="10" value="100" />
+                    <select id="sim-asset" aria-label="Asset selection">
+                      <option>USDC</option>
+                      <option>XLM</option>
+                    </select>
+                  </div>
+                </div>
+                <div class="form-group">
+                  <label for="sim-recipient">Recipient Identifier</label>
+                  <input id="sim-recipient" type="text" value="Receiver corridor wallet" />
+                </div>
+                <div class="form-group">
+                  <label for="sim-purpose">Remittance Purpose</label>
+                  <select id="sim-purpose">
+                    <option>Family support</option>
+                    <option>Education</option>
+                    <option>Medical</option>
+                    <option>Business invoice</option>
+                  </select>
+                </div>
+                <button class="primary full-width" type="submit">Run ZK Proof Simulation</button>
+              </form>
+
+              <!-- Simulator Running State -->
+              <div id="sim-running" class="sim-running hidden" style="display: grid; gap: 16px;">
+                <!-- Simulated nodes drawing -->
+                <div style="display:flex; justify-content:center; align-items:center; height:40px;">
+                  <svg width="240" height="40" viewBox="0 0 240 40" aria-hidden="true" style="overflow:visible;">
+                    <circle cx="20" cy="20" r="6" fill="#ea580c" />
+                    <path d="M 26,20 L 104,20" stroke="rgba(255, 255, 255, 0.15)" stroke-width="2" />
+                    <path d="M 26,20 L 104,20" stroke="#f59e0b" stroke-width="2" stroke-dasharray="5 5" style="animation: dash 2s linear infinite;" />
+                    <circle cx="110" cy="20" r="6" fill="#f59e0b" />
+                    <path d="M 116,20 L 194,20" stroke="rgba(255, 255, 255, 0.15)" stroke-width="2" />
+                    <path d="M 116,20 L 194,20" stroke="#10b981" stroke-width="2" stroke-dasharray="5 5" style="animation: dash 2s linear infinite;" />
+                    <circle cx="200" cy="20" r="6" fill="#10b981" />
+                  </svg>
+                </div>
+
+                <!-- Stepper -->
+                <div class="sim-steps">
+                  <div class="sim-step" id="step-deposit">
+                    <div class="sim-step-icon">1</div>
+                    <div class="sim-step-info">
+                      <strong>Commitment Hashing</strong>
+                      <span>Poseidon(nullifier, note secret)</span>
+                    </div>
+                  </div>
+                  <div class="sim-step" id="step-tree">
+                    <div class="sim-step-icon">2</div>
+                    <div class="sim-step-info">
+                      <strong>Merkle Insertion</strong>
+                      <span>Updating root on Stellar contract</span>
+                    </div>
+                  </div>
+                  <div class="sim-step" id="step-proof">
+                    <div class="sim-step-icon">3</div>
+                    <div class="sim-step-info">
+                      <strong>Synthesizing Groth16</strong>
+                      <span>Witness computed, proof generated</span>
+                    </div>
+                  </div>
+                  <div class="sim-step" id="step-verify">
+                    <div class="sim-step-icon">4</div>
+                    <div class="sim-step-info">
+                      <strong>On-chain Verification</strong>
+                      <span>Soroban contract verifier returns true</span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Console Log inside scanline overlay container -->
+                <div class="sim-console-wrapper">
+                  <div class="sim-console" id="sim-console" role="log" aria-live="polite">
+                    Waiting to compile ZK parameters...
+                  </div>
+                </div>
+
+                <button class="secondary full-width" id="sim-reset" type="button">Reset Simulator</button>
               </div>
             </div>
           </div>
+        </div>
+      </section>
 
-          <!-- ZK Simulator Widget -->
-          <div class="panel sim-card float-element" id="simulator">
-          <div class="sim-header">
+      <!-- Interactive ZK Pipeline Section -->
+      <section class="landing-pipeline-section">
+        <div class="pipeline-section-header">
+          <p class="eyebrow" style="margin:0 auto 12px;">
+            <span style="display:inline-block; width:6px; height:6px; border-radius:50%; background:var(--color-emerald); animation: pulse-core 1.5s infinite alternate;"></span>
+            Stellar Privacy Pipeline
+          </p>
+          <h2>Watch ZK-SNARK Remittance Flow</h2>
+          <p>USDC deposits enter the pool, derive private notes, and exit Bob's wallet as INR on Stellar rails.</p>
+        </div>
+
+        <!-- Animated Remittance Corridor Pipeline -->
+        <div class="zk-pipeline-card" aria-label="Private remittance route preview">
+          <div class="zk-pipeline">
+            <div class="pipeline-node sender">
+              <h4>Sender</h4>
+              <strong>USDC</strong>
+              <small>Wallet A</small>
+            </div>
+
+            <div class="pipeline-flow">
+              <div class="flow-line"></div>
+              <div class="flow-pulse-left"></div>
+              <div class="flow-pulse-left delay-1"></div>
+              <div class="flow-pulse-left delay-2"></div>
+            </div>
+
+            <div class="zk-center-pool">
+              <div class="zk-pool-sphere">
+                <div class="zk-ring-1"></div>
+                <div class="zk-ring-2"></div>
+                <div class="zk-sphere-core">ZK</div>
+              </div>
+            </div>
+
+            <div class="pipeline-flow">
+              <div class="flow-line"></div>
+              <div class="flow-pulse-right"></div>
+              <div class="flow-pulse-right delay-1"></div>
+              <div class="flow-pulse-right delay-2"></div>
+            </div>
+
+            <div class="pipeline-node receiver">
+              <h4>Receiver</h4>
+              <strong>INR</strong>
+              <small>Wallet B</small>
+            </div>
+          </div>
+
+          <div class="receipt-chip">
+            <span class="brand-mark" aria-hidden="true"></span>
             <div>
-              <p class="eyebrow" style="margin: 0;">Compliance-ready ZK</p>
-              <h3>ZK-SNARK Simulator</h3>
+              <strong>Selective disclosure ready</strong>
+              <small>Verify amount and purpose without exposing the source wallet.</small>
             </div>
-            <span class="pill" id="sim-status">Idle</span>
-          </div>
-
-          <!-- Simulator Input Form -->
-          <form id="sim-form" class="sim-form">
-            <div class="form-group">
-              <label for="sim-amount">Amount (USDC equivalent)</label>
-              <div class="amount-row">
-                <input id="sim-amount" type="number" min="10" value="100" />
-                <select id="sim-asset" aria-label="Asset selection">
-                  <option>USDC</option>
-                  <option>XLM</option>
-                </select>
-              </div>
-            </div>
-            <div class="form-group">
-              <label for="sim-recipient">Recipient Identifier</label>
-              <input id="sim-recipient" type="text" value="Receiver corridor wallet" />
-            </div>
-            <div class="form-group">
-              <label for="sim-purpose">Remittance Purpose</label>
-              <select id="sim-purpose">
-                <option>Family support</option>
-                <option>Education</option>
-                <option>Medical</option>
-                <option>Business invoice</option>
-              </select>
-            </div>
-            <button class="primary full-width" type="submit">Run ZK Proof Simulation</button>
-          </form>
-
-          <!-- Simulator Running State -->
-          <div id="sim-running" class="sim-running hidden">
-            <!-- Simulated nodes drawing -->
-            <div style="display:flex; justify-content:center; align-items:center; height:50px;">
-              <svg width="240" height="40" viewBox="0 0 240 40" aria-hidden="true" style="overflow:visible;">
-                <circle cx="20" cy="20" r="8" fill="#00f5a0" />
-                <path d="M 28,20 L 100,20" stroke="#00f5a0" stroke-width="2" stroke-dasharray="5 5" style="animation: dash 2s linear infinite;" />
-                <circle cx="110" cy="20" r="8" fill="#00d9f5" />
-                <path d="M 118,20 L 190,20" stroke="#00d9f5" stroke-width="2" stroke-dasharray="5 5" style="animation: dash 2s linear infinite;" />
-                <circle cx="200" cy="20" r="8" fill="#f59e0b" />
-              </svg>
-            </div>
-
-            <!-- Stepper -->
-            <div class="sim-steps">
-              <div class="sim-step" id="step-deposit">
-                <div class="sim-step-icon">1</div>
-                <div class="sim-step-info">
-                  <strong>Commitment Hashing</strong>
-                  <span>Poseidon(nullifier, note secret)</span>
-                </div>
-              </div>
-              <div class="sim-step" id="step-tree">
-                <div class="sim-step-icon">2</div>
-                <div class="sim-step-info">
-                  <strong>Merkle Insertion</strong>
-                  <span>Updating root on Stellar contract</span>
-                </div>
-              </div>
-              <div class="sim-step" id="step-proof">
-                <div class="sim-step-icon">3</div>
-                <div class="sim-step-info">
-                  <strong>Synthesizing Groth16</strong>
-                  <span>Witness computed, proof generated</span>
-                </div>
-              </div>
-              <div class="sim-step" id="step-verify">
-                <div class="sim-step-icon">4</div>
-                <div class="sim-step-info">
-                  <strong>On-chain Verification</strong>
-                  <span>Soroban contract verifier returns true</span>
-                </div>
-              </div>
-            </div>
-
-            <!-- Console Log -->
-            <div class="sim-console" id="sim-console" role="log" aria-live="polite">
-              Waiting to compile ZK parameters...
-            </div>
-
-            <button class="secondary full-width" id="sim-reset" type="button" class="hidden">Reset Simulator</button>
-          </div>
           </div>
         </div>
       </section>
@@ -207,30 +265,33 @@
 
       <!-- Features Section -->
       <section class="landing-features" id="features">
-        <div class="panel feature-card">
-          <div class="feature-icon" aria-hidden="true">ZK</div>
+        <div class="beam-panel feature-card">
+          <div class="feature-icon" aria-hidden="true"></div>
           <h3>Privacy that survives scrutiny</h3>
           <p>Withdrawals prove membership, nullifier correctness, and association-set validity without tying the receiver back to the funding wallet.</p>
         </div>
-        <div class="panel feature-card">
-          <div class="feature-icon" aria-hidden="true">VK</div>
+        <div class="beam-panel feature-card">
+          <div class="feature-icon" aria-hidden="true"></div>
           <h3>Receipts for the people who ask</h3>
           <p>Viewing keys let a corridor operator or auditor validate the disclosed facts while keeping the private note opening out of sight.</p>
         </div>
-        <div class="panel feature-card">
-          <div class="feature-icon" aria-hidden="true">SR</div>
-          <h3>Built where remittance already moves</h3>
+        <div class="beam-panel feature-card">
+          <div class="feature-icon" aria-hidden="true"></div>
+          <h3>Built where remittance moves</h3>
           <p>Soroban contracts keep the pool, verifier, and nullifier registry close to Stellar payment rails instead of hiding behind a separate ledger.</p>
         </div>
       </section>
 
       <!-- Compliance Section -->
       <section class="landing-compliance" id="compliance">
-        <div class="panel compliance-panel">
+        <div class="beam-panel compliance-panel" style="padding: 32px;">
           <div>
-            <p class="eyebrow">Auditable Privacy</p>
+            <p class="eyebrow">
+              <span style="display:inline-block; width:6px; height:6px; border-radius:50%; background:var(--color-emerald); animation: pulse-core 1.5s infinite alternate;"></span>
+              Auditable Privacy
+            </p>
             <h2>Built for Regulatory Standards</h2>
-            <p>
+            <p style="margin-top:16px;">
               Unlike legacy privacy pools that hide transaction traces entirely, Setu introduces a selective disclosure receipt. Receivers can construct a cryptographic witness proving a specific withdrawal was sourced from a valid deposit, without revealing the deposit address.
             </p>
             <p>
@@ -249,53 +310,65 @@
               <span>Setu ZK</span>
             </div>
           </div>
-        </div>
       </section>
+
+      <!-- Footer with WebGL Shader Canvas -->
+      <footer class="landing-footer">
+        <canvas id="footer-shader-canvas"></canvas>
+        <div class="footer-content">
+          <div class="footer-brand">
+            <span class="brand-mark" aria-hidden="true"></span>
+            <div>
+              <strong>Setu</strong>
+              <small>Stellar private remittance desk</small>
+            </div>
+          </div>
+          <div class="footer-meta">
+            <p>ZK-SNARK selective disclosures on Stellar. Secure. Compliant. Fast.</p>
+            <span>&copy; 2026 Setu Network. All rights reserved.</span>
+          </div>
+        </div>
+      </footer>
     </div>
 
     <!-- 2. AUTHENTICATION PAGES (DEDICATED WRAPPERS) -->
-    <div id="auth-page" class="auth-view" style="display:none;">
-      <section class="auth-story" aria-label="Setu trust story">
-        <div class="auth-story-media" aria-hidden="true">
-          <img src="./assets/setu-product.png" alt="" />
-          <div class="auth-orbit auth-orbit-one"></div>
-          <div class="auth-orbit auth-orbit-two"></div>
-        </div>
-        <div class="auth-story-content">
-          <a class="brand auth-brand" href="#home" aria-label="Setu home">
-            <span class="brand-mark" aria-hidden="true"></span>
-            <span>
-              <strong>Setu</strong>
-              <small>Stellar private remittance</small>
-            </span>
-          </a>
-          <div>
-            <p class="eyebrow">Private remittance desk</p>
-            <h1 id="auth-story-title">Welcome back to Setu</h1>
-            <p id="auth-story-copy">
-              Continue from a verified Stellar testnet flow with private
-              withdrawals, disclosure receipts, and tamper-resistant audit
-              evidence in one workspace.
-            </p>
-          </div>
-          <div class="auth-step-list" aria-label="Account setup progress">
-            <div class="auth-step-item active">
-              <span class="auth-step-num">1</span>
-              <span id="auth-step-one">Enter secure credentials</span>
-            </div>
-            <div class="auth-step-item inactive">
-              <span class="auth-step-num">2</span>
-              <span>Open remittance workspace</span>
-            </div>
-            <div class="auth-step-item inactive">
-              <span class="auth-step-num">3</span>
-              <span>Generate proof receipts</span>
-            </div>
-          </div>
-        </div>
-      </section>
+    <div id="auth-page" class="aurora-auth" style="display:none;">
+      <!-- LEFT COLUMN — Video Hero -->
+      <div class="aurora-hero">
+        <video class="aurora-video" autoplay muted loop playsinline>
+          <source src="https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260506_081238_406ed0e3-5d83-436e-a512-0bbff7ec5b95.mp4" type="video/mp4" />
+        </video>
 
-      <section class="auth-form-shell" aria-label="Setu authentication">
+        <!-- Hero content bottom-left -->
+        <div class="aurora-hero-content">
+          <a class="aurora-brand" href="#home" aria-label="Setu home">
+            <span class="brand-mark" aria-hidden="true"></span>
+            <strong>Setu</strong>
+          </a>
+          <h1 id="auth-story-title" class="aurora-title">Join Setu</h1>
+          <p id="auth-story-copy" class="aurora-subtitle">
+            Follow these 3 quick phases to activate your private remittance space.
+          </p>
+          <div class="aurora-steps" aria-label="Account setup progress">
+            <div class="aurora-step active">
+              <span class="aurora-step-num">1</span>
+              <span id="auth-step-one">Register your identity</span>
+            </div>
+            <div class="aurora-step inactive">
+              <span class="aurora-step-num">2</span>
+              <span>Configure your workspace</span>
+            </div>
+            <div class="aurora-step inactive">
+              <span class="aurora-step-num">3</span>
+              <span>Finalize your profile</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- RIGHT COLUMN — Form Panel -->
+      <div class="aurora-form-col">
+        <!-- Login Card -->
         <div class="auth-card" id="login-card">
           <div class="auth-kicker">
             <span class="mini-mark" aria-hidden="true"></span>
@@ -303,34 +376,41 @@
           </div>
           <div class="auth-header">
             <h2>Sign in</h2>
-            <p>Welcome back. Access your private remittance desk.</p>
+            <p>Access your private remittance workspace.</p>
           </div>
           <div class="auth-status" data-auth-status hidden></div>
           <div class="social-btn-row">
             <button class="social-btn" type="button" data-auth-provider="google">
-              <span aria-hidden="true">G</span>
+              <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/>
+                <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+                <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
+                <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+              </svg>
               Google
             </button>
             <button class="social-btn" type="button" data-auth-provider="github">
-              <span aria-hidden="true">GH</span>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/>
+              </svg>
               GitHub
             </button>
           </div>
           <div class="separator-row">
-            <span class="separator-text">or continue with email</span>
+            <span class="separator-text">Or</span>
           </div>
           <form id="login-form" class="auth-form">
             <div class="form-group">
-              <label for="login-email">Email address</label>
-              <input id="login-email" name="email" type="email" autocomplete="email" required />
+              <label for="login-email">Email</label>
+              <input id="login-email" name="email" type="email" autocomplete="email" placeholder="you@company.com" required />
             </div>
             <div class="form-group">
               <div class="label-row">
                 <label for="login-password">Password</label>
-                <button id="reset-password" type="button">Reset password</button>
+                <button id="reset-password" type="button">Forgot?</button>
               </div>
               <div class="password-wrapper">
-                <input id="login-password" name="password" type="password" autocomplete="current-password" required />
+                <input id="login-password" name="password" type="password" autocomplete="current-password" placeholder="Enter password" required />
                 <button class="eye-btn" type="button" data-password-toggle="login-password" aria-label="Show password">
                   <svg viewBox="0 0 24 24" aria-hidden="true">
                     <path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z"></path>
@@ -339,56 +419,67 @@
                 </button>
               </div>
             </div>
-            <button class="primary full-width auth-submit" type="submit">Sign in</button>
+            <button class="aurora-submit" type="submit">
+              Sign in
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+            </button>
           </form>
           <p class="auth-switch-text">
-            New to Setu? <button id="to-signup" type="button">Create account</button>
+            New to the team? <button id="to-signup" type="button">Create account</button>
           </p>
         </div>
 
+        <!-- Signup Card -->
         <div class="auth-card" id="signup-card" style="display:none;">
           <div class="auth-kicker">
             <span class="mini-mark" aria-hidden="true"></span>
-            Team onboarding
+            Setu account
           </div>
           <div class="auth-header">
-            <h2>Create account</h2>
-            <p>Start with a compliant privacy-pool workspace on Stellar.</p>
+            <h2>Create New Profile</h2>
+            <p>Input your basic details to begin the journey.</p>
           </div>
           <div class="auth-status" data-auth-status hidden></div>
           <div class="social-btn-row">
             <button class="social-btn" type="button" data-auth-provider="google">
-              <span aria-hidden="true">G</span>
+              <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/>
+                <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+                <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
+                <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+              </svg>
               Google
             </button>
             <button class="social-btn" type="button" data-auth-provider="github">
-              <span aria-hidden="true">GH</span>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/>
+              </svg>
               GitHub
             </button>
           </div>
           <div class="separator-row">
-            <span class="separator-text">or register with email</span>
+            <span class="separator-text">Or</span>
           </div>
           <form id="signup-form" class="auth-form">
             <div class="auth-name-grid">
               <div class="form-group">
-                <label for="signup-first">First name</label>
-                <input id="signup-first" name="firstName" type="text" autocomplete="given-name" required />
+                <label for="signup-first">First Name</label>
+                <input id="signup-first" name="firstName" type="text" autocomplete="given-name" placeholder="First name" required />
               </div>
               <div class="form-group">
-                <label for="signup-last">Last name</label>
-                <input id="signup-last" name="lastName" type="text" autocomplete="family-name" required />
+                <label for="signup-last">Last Name</label>
+                <input id="signup-last" name="lastName" type="text" autocomplete="family-name" placeholder="Last name" required />
               </div>
             </div>
             <input id="signup-name" type="hidden" />
             <div class="form-group">
-              <label for="signup-email">Email address</label>
-              <input id="signup-email" name="email" type="email" autocomplete="email" required />
+              <label for="signup-email">Email</label>
+              <input id="signup-email" name="email" type="email" autocomplete="email" placeholder="you@company.com" required />
             </div>
             <div class="form-group">
               <label for="signup-password">Password</label>
               <div class="password-wrapper">
-                <input id="signup-password" name="password" type="password" autocomplete="new-password" minlength="8" required />
+                <input id="signup-password" name="password" type="password" autocomplete="new-password" minlength="8" placeholder="Create password" required />
                 <button class="eye-btn" type="button" data-password-toggle="signup-password" aria-label="Show password">
                   <svg viewBox="0 0 24 24" aria-hidden="true">
                     <path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z"></path>
@@ -396,15 +487,18 @@
                   </svg>
                 </button>
               </div>
-              <p class="field-hint">Use 8 or more characters for production accounts.</p>
+              <p class="field-hint">Requires at least 8 symbols.</p>
             </div>
-            <button class="primary full-width auth-submit" type="submit">Create account</button>
+            <button class="aurora-submit" type="submit">
+              Create Account
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+            </button>
           </form>
           <p class="auth-switch-text">
-            Already have an account? <button id="to-login" type="button">Sign in</button>
+            Member of the team? <button id="to-login" type="button">Log in</button>
           </p>
         </div>
-      </section>
+      </div>
     </div>
 
     <!-- 3. MAIN DASHBOARD SHELL (APP WORKSPACE) -->
