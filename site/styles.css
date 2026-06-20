@@ -27,6 +27,7 @@
 
   --transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
   --shadow-dark: 0 24px 80px rgba(0, 0, 0, 0.8);
+  --setu-mark: url('./assets/setu-mark.svg');
 }
 
 * {
@@ -396,11 +397,12 @@ textarea {
 }
 
 .mini-mark {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: var(--color-emerald);
-  box-shadow: 0 0 18px rgba(16, 185, 129, 0.8);
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+  border-radius: 5px;
+  background: #060c0a var(--setu-mark) center / cover no-repeat;
+  box-shadow: 0 0 18px rgba(16, 185, 129, 0.45);
 }
 
 .auth-header {
@@ -727,6 +729,14 @@ textarea {
   color: var(--text-primary);
 }
 
+.landing-nav a.primary {
+  color: #000000;
+}
+
+.landing-nav a.secondary {
+  color: var(--text-primary);
+}
+
 /* Hero Section */
 .landing-hero {
   display: grid;
@@ -919,17 +929,32 @@ textarea {
 }
 
 .visual-node {
-  width: 90px;
-  height: 90px;
-  border-radius: 50%;
-  background: var(--bg-black);
-  border: 2px solid var(--color-amber);
+  width: 112px;
+  height: 112px;
+  border-radius: 22px;
+  background: rgba(6, 12, 10, 0.94);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   display: grid;
   place-items: center;
+  align-content: center;
+  gap: 8px;
   font-family: var(--font-sora);
   font-weight: 700;
+  font-size: 0.78rem;
+  letter-spacing: 0;
   z-index: 3;
-  box-shadow: 0 0 30px rgba(245, 158, 11, 0.18);
+  box-shadow:
+    0 0 0 1px rgba(0, 245, 160, 0.12),
+    0 22px 48px rgba(0, 0, 0, 0.35),
+    0 0 30px rgba(0, 245, 160, 0.16);
+}
+
+.visual-logo {
+  width: 56px;
+  height: 56px;
+  border-radius: 14px;
+  background: #060c0a var(--setu-mark) center / cover no-repeat;
+  box-shadow: 0 0 22px rgba(0, 245, 160, 0.18);
 }
 
 .visual-shield {
@@ -982,16 +1007,15 @@ textarea {
 }
 
 .brand-mark {
-  display: grid;
-  place-items: center;
+  display: block;
   width: 40px;
   height: 40px;
+  flex: 0 0 40px;
   border-radius: 12px;
-  background: #ffffff;
-  color: #000000;
-  font-family: var(--font-sora);
-  font-weight: 800;
-  font-size: 1.35rem;
+  background: #060c0a var(--setu-mark) center / cover no-repeat;
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.08),
+    0 14px 34px rgba(0, 245, 160, 0.18);
 }
 
 .brand strong {
