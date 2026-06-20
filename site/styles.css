@@ -1095,20 +1095,32 @@ textarea {
   overflow: hidden;
 }
 
+#landing-shader-canvas {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0.96;
+}
+
 .cyber-grid {
   position: absolute;
   inset: 0;
+  z-index: 2;
   background-image:
-    linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+    linear-gradient(rgba(255, 255, 255, 0.028) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.024) 1px, transparent 1px);
   background-size: 50px 50px;
   background-position: center top;
   mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, #000 80%, transparent 100%);
   -webkit-mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, #000 80%, transparent 100%);
+  opacity: 0.72;
 }
 
 .mouse-spotlight {
   position: absolute;
+  z-index: 3;
   top: var(--mouse-y, -1000px);
   left: var(--mouse-x, -1000px);
   width: 600px;
@@ -1268,7 +1280,8 @@ textarea {
     linear-gradient(105deg, rgba(124, 58, 237, 0.2), rgba(67, 56, 202, 0.16) 42%, rgba(16, 185, 129, 0.06) 100%),
     repeating-radial-gradient(circle at 35% 38%, rgba(255, 255, 255, 0.08) 0 1px, transparent 1px 4px),
     repeating-linear-gradient(102deg, rgba(255, 255, 255, 0.035) 0 1px, transparent 1px 6px);
-  opacity: 0.88;
+  opacity: 0.42;
+  mix-blend-mode: screen;
 }
 
 .landing-hero::after {
@@ -1288,7 +1301,8 @@ textarea {
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.16),
     0 28px 90px rgba(20, 6, 64, 0.46);
-  opacity: 0.82;
+  opacity: 0.5;
+  mix-blend-mode: screen;
 }
 
 .hero-text .eyebrow {
@@ -1414,7 +1428,7 @@ textarea {
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.16),
     0 30px 80px rgba(12, 5, 40, 0.62);
-  opacity: 0.72;
+  opacity: 0.62;
   z-index: -1;
 }
 
