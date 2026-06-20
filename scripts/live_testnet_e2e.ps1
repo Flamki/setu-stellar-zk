@@ -3,25 +3,63 @@ param(
     [string]$Source = "demo_user",
     [string]$Network = "testnet",
     [string]$TokenAddress = "CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC",
-    [string]$Stellar = "C:\Users\bbook\Desktop\zk\bin\stellar.exe",
-    [string]$Snarkjs = "C:\Users\bbook\Desktop\zk\node_modules\snarkjs\build\cli.cjs"
+    [string]$Stellar = "",
+    [string]$Snarkjs = ""
 )
 
 $ErrorActionPreference = "Stop"
 $PSNativeCommandUseErrorActionPreference = $false
 
+$RepoRoot = Split-Path -Parent $PSScriptRoot
+$WorkspaceRoot = Split-Path -Parent $RepoRoot
+
+function Resolve-FirstExistingPath($Candidates) {
+    foreach ($candidate in $Candidates) {
+        if ($candidate -and (Test-Path $candidate)) {
+            return (Resolve-Path $candidate).Path
+        }
+    }
+    return ""
+}
+
+function Resolve-CommandPath($Name) {
+    $command = Get-Command $Name -ErrorAction SilentlyContinue
+    if ($command) {
+        return $command.Source
+    }
+    return ""
+}
+
 function Extract-Hex($Text) {
     (($Text -split "`n") | Select-String -Pattern '^[0-9a-fA-F]+$' | Select-Object -Last 1).Matches.Value
 }
 
-if (-not (Test-Path $Stellar)) {
-    throw "stellar CLI not found at $Stellar"
+if (-not $Stellar) {
+    $Stellar = Resolve-FirstExistingPath @(
+        (Join-Path $WorkspaceRoot "bin\stellar.exe"),
+        (Resolve-CommandPath "stellar")
+    )
 }
-if (-not (Test-Path $Snarkjs)) {
-    throw "snarkjs CLI not found at $Snarkjs"
+if (-not $Snarkjs) {
+    $Snarkjs = Resolve-FirstExistingPath @(
+        (Join-Path $WorkspaceRoot "node_modules\snarkjs\build\cli.cjs"),
+        (Resolve-CommandPath "snarkjs")
+    )
 }
 
-$env:PATH = "C:\Users\bbook\.cargo\bin;C:\Users\bbook\Desktop\zk\node_modules\.bin;C:\Users\bbook\Desktop\zk\bin;" + $env:PATH
+if (-not (Test-Path $Stellar)) {
+    throw "stellar CLI not found. Pass -Stellar or add stellar to PATH."
+}
+if (-not (Test-Path $Snarkjs)) {
+    throw "snarkjs CLI not found. Run npm install in the workspace or pass -Snarkjs."
+}
+
+$pathParts = @(
+    (Join-Path $WorkspaceRoot "node_modules\.bin"),
+    (Join-Path $WorkspaceRoot "bin"),
+    (Join-Path $HOME ".cargo\bin")
+) | Where-Object { Test-Path $_ }
+$env:PATH = (($pathParts + $env:PATH) -join [IO.Path]::PathSeparator)
 
 if (-not $ContractId) {
     cargo build --target wasm32v1-none --release -p privacy-pools

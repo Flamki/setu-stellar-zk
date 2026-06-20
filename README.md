@@ -175,14 +175,13 @@ Prerequisites:
 Install JS dependencies from the parent workspace if needed:
 
 ```powershell
-cd C:\Users\bbook\Desktop\zk
+cd ..
 npm install
 ```
 
 From this repository:
 
 ```powershell
-cd C:\Users\bbook\Desktop\zk\fork
 cargo test
 cargo build --target wasm32v1-none --release -p privacy-pools
 ```
@@ -190,7 +189,7 @@ cargo build --target wasm32v1-none --release -p privacy-pools
 Verify the regenerated disclosure proof:
 
 ```powershell
-node C:\Users\bbook\Desktop\zk\node_modules\snarkjs\build\cli.cjs groth16 verify `
+npx snarkjs groth16 verify `
   circuits\build_disc\disc_vk.json `
   circuits\build_disc\public.json `
   circuits\build_disc\proof.json
