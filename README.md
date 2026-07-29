@@ -236,6 +236,104 @@ contract:
   -ContractId CDXLQFYQJVDXBZDI5QVYRAM5TGPMZQWS424FCQWYVNGSKSSHPU6XXAXT
 ```
 
+### Windows Setup Troubleshooting
+
+This repo has Windows-specific path and CLI quirks. Use the checklist below
+when a fresh Windows setup runs into trouble. All snippets are PowerShell.
+
+**1. Use PowerShell, not `cmd`.** The README commands assume PowerShell because
+the live testnet script (`scripts\live_testnet_e2e.ps1`) is PowerShell. On
+modern Windows PowerShell, `npm` resolves to `npm.cmd` automatically. On
+older or restricted shells you may see:
+
+```text
+npm : The term 'npm' is not recognized as the name of a cmdlet, function, ...
+```
+
+Fix by running once:
+
+```powershell
+Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
+```
+
+or invoke `npm.cmd` directly in restricted shells.
+
+**2. Stellar CLI path.** Stellar CLI 26.x is often not on `$env:PATH` after
+install. The e2e script looks for `..\bin\stellar.exe` first, then any
+`stellar` on `PATH`, then fails with:
+
+```text
+stellar CLI not found. Pass -Stellar or add stellar to PATH.
+```
+
+Fix with the override flag (no global PATH edit needed):
+
+```powershell
+.\scripts\live_testnet_e2e.ps1 `
+  -Stellar "C:\Users\<you>\.cargo\bin\stellar.exe"
+```
+
+**3. snarkjs path.** snarkjs 0.7.x is installed into the parent workspace's
+`node_modules`. The script looks for `..\node_modules\snarkjs\build\cli.cjs`,
+then `snarkjs` on `PATH`, then fails with:
+
+```text
+snarkjs CLI not found. Run npm install in the workspace or pass -Snarkjs.
+```
+
+Fix from the repo root:
+
+```powershell
+cd ..
+npm install
+cd setu-stellar-zk
+```
+
+or pass the path explicitly:
+
+```powershell
+.\scripts\live_testnet_e2e.ps1 `
+  -Snarkjs "..\node_modules\snarkjs\build\cli.cjs"
+```
+
+**4. circomlib lookup.** The `Makefile` hardcodes a macOS Homebrew path
+(`/opt/homebrew/lib/node_modules/circomlib/circuits`) and will not work on
+Windows as-is. Either run `circom` directly with `$env:CIRCOMLIB` set, or
+install circomlib globally and point the variable at it:
+
+```powershell
+npm install -g circomlib
+$env:CIRCOMLIB = (npm root -g) + "\circomlib\circuits"
+cd circuits
+circom main.circom --r1cs --wasm --sym -o build -l $env:CIRCOMLIB --prime bls12381
+```
+
+`scripts\disclosure_e2e.sh` is bash-only; on Windows, run the disclosure flow
+through `scripts\live_testnet_e2e.ps1` instead, which passes `-l $CIRCOMLIB`
+through to `circom` for you.
+
+**5. PATH injection inside the e2e script.** `live_testnet_e2e.ps1` prepends
+`..\node_modules\.bin`, `..\bin`, and `$HOME\.cargo\bin` to `$env:PATH` for
+the duration of the script. Your interactive `$env:PATH` is unchanged. If a
+step inside the script still says a tool is missing, prefer the `-Stellar`
+and `-Snarkjs` overrides over editing global PATH.
+
+**6. Common error table.**
+
+| Symptom | Likely cause | Fix |
+|---|---|---|
+| `npm : The term 'npm' is not recognized...` | PowerShell without `PATHEXT`/shim | Run `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` once, or use `npm.cmd` |
+| `stellar CLI not found. Pass -Stellar...` | Stellar CLI not on PATH | Pass `-Stellar "C:\path\to\stellar.exe"` |
+| `snarkjs CLI not found. Run npm install...` | Workspace `node_modules\snarkjs` missing | `cd ..` then `npm install` |
+| `circom: error: template 'poseidon' not found` | `-l $CIRCOMLIB` missing or wrong | `$env:CIRCOMLIB = (npm root -g) + "\circomlib\circuits"` |
+| `'snarkjs' is not recognized` inside the script | Script PATH injection didn't pick it up | Pass `-Snarkjs "..\node_modules\snarkjs\build\cli.cjs"` |
+| `error: linking with 'cc' failed` on `cargo build` | Missing MSVC toolchain | Install "Desktop development with C++" via Visual Studio Build Tools |
+
+**7. Prototype limits.** The PowerShell script auto-locates `stellar` and
+`snarkjs` for convenience; it is not a substitute for a properly configured
+Windows development environment, and the trusted setup it produces is
+staging-only.
+
 ## Authentication
 
 The web app uses Supabase Auth for production sign up, sign in, OAuth redirect,
