@@ -205,6 +205,13 @@ Prerequisites:
 - `snarkjs` 0.7.x.
 - `circomlib`.
 
+Run `node scripts/check-prereqs.cjs` to check which of these are actually
+installed. It prints required vs. found versions for each and exits non-zero
+if anything is missing or off the required track. It's a prototype
+convenience check, not a hermetic environment validator: it only reads
+version strings from whatever is already on PATH (or already `npm install`ed
+for `snarkjs`/`circomlib`), it doesn't install or sandbox anything.
+
 Install JS dependencies from the parent workspace if needed:
 
 ```powershell
