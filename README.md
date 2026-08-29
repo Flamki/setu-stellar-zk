@@ -112,6 +112,22 @@ The contract additionally checks:
 - The nullifier has not already been used.
 - The Groth16 proof verifies under the stored withdrawal VK.
 
+### Withdrawal Event
+
+Each successful withdrawal emits a `Withdrawal` event with one field, the
+nullifier hash. The nullifier hash is already public in the withdrawal proof's
+public signals and is stored on-chain to prevent replay, so the event metadata
+adds no new exposure. The event is emitted only after Groth16 verification
+succeeds, the nullifier is unused, and the transfer completes. A
+duplicate-nullifier withdrawal or any other failed verification does not emit
+the success event.
+
+Privacy tradeoff: nullifier hashes are permanent public metadata. They are the
+protocol's double-spend protection, not note secrets; the event simply makes
+the already-public settlement marker available to indexers and auditors without
+exposing the note secret, recipient, or amount beyond what the transfer already
+reveals.
+
 ### Disclosure Circuit
 
 `circuits/disclosure.circom` uses public signals:

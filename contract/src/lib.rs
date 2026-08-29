@@ -3,7 +3,7 @@
 extern crate alloc;
 
 use soroban_sdk::{
-    contract, contractimpl, log, symbol_short, token, vec, Address, Bytes, BytesN, Env, String,
+    contract, contractimpl, symbol_short, token, vec, Address, Bytes, BytesN, Env, String,
     Symbol, Vec,
 };
 
@@ -168,7 +168,7 @@ impl PrivacyPoolsContract {
     /// # Returns
     ///
     /// Returns a vector containing status messages:
-    /// * Empty vector `[]` on successful withdrawal (success is logged as a diagnostic event)
+    /// * Empty vector `[]` on successful withdrawal (a `withdraw` event is emitted)
     /// * `["Nullifier already used"]` if the nullifier has been used before
     /// * `["Couldn't verify coin ownership proof"]` if the zero-knowledge proof verification fails
     /// * `["Insufficient balance"]` if the contract doesn't have enough funds
@@ -190,6 +190,9 @@ impl PrivacyPoolsContract {
     /// * The withdrawal doesn't reveal which specific commitment is being spent
     /// * The nullifier ensures the same commitment cannot be spent twice
     /// * The zero-knowledge proof proves ownership without revealing the commitment details
+    /// * A `withdraw` event is emitted with the nullifier hash. The nullifier is
+    ///   already part of the proof's public signals and stored on-chain, so this
+    ///   event adds no new linkability beyond the protocol's existing data.
     pub fn withdraw(
         env: &Env,
         to: Address,
@@ -272,14 +275,16 @@ impl PrivacyPoolsContract {
         }
 
         // Add nullifier to used nullifiers only after all checks pass
-        nullifiers.push_back(nullifier);
+        nullifiers.push_back(nullifier.clone());
         env.storage().instance().set(&NULL_KEY, &nullifiers);
 
         // Transfer the asset from the contract to the recipient
         token_client.transfer(&env.current_contract_address(), &to, &FIXED_AMOUNT);
 
-        // Log success message as diagnostic event
-        log!(&env, "{}", ERROR_WITHDRAW_SUCCESS);
+        // Emit a withdraw event with the nullifier hash as public metadata.
+        // Privacy tradeoff: the nullifier is already revealed in the proof public
+        // signals and stored in the nullifier set, so this event adds no new linkability.
+        env.events().publish((symbol_short!("withdraw"),), nullifier);
 
         vec![env]
     }

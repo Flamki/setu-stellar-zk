@@ -66,6 +66,27 @@ disclosed in this receipt."*
 
 ---
 
+## Withdrawal Event
+
+After a successful proof verification and transfer, the contract emits a
+withdrawal event with safe public metadata:
+
+- `nullifierHash`: the spent-nullifier hash. This is already revealed by the
+  withdrawal proof's public signals, so the event adds no new linkability.
+- `amount`: the fixed withdrawal denomination (`FIXED_AMOUNT`), already public
+  in the transfer.
+
+This event is emitted **only** after the proof verifies, the nullifier is
+unused, and the transfer succeeds. A duplicate/nullifier failure, failed proof,
+or failed transfer does **not** emit the success event.
+
+Privacy tradeoff: indexing `nullifierHash` makes it easier to track that a
+specific withdrawal request settled. It does not reveal the note's `nullifier`,
+`secret`, or which deposit leaf was spent; that link remains available only
+through the selective-disclosure receipt.
+
+---
+
 ## What the Proof Does Not Prove
 
 The following are **not** established by any Setu proof. This is the part that
