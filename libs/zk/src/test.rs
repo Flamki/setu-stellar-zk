@@ -423,3 +423,102 @@ fn test_public_signals_reject_truncated_payload() {
         Some(Groth16Error::MalformedPublicSignals)
     );
 }
+
+/// Spec: docs/public-signal-serialization.md — Withdrawal public order
+/// snarkjs order: [nullifierHash, withdrawnValue, stateRoot, associationRoot].
+/// Wire format: u32 BE length prefix `n`, then `n` × 32-byte big-endian Fr.
+#[test]
+fn test_withdrawal_public_signal_order_encoding() {
+    let env = Env::default();
+
+    let nullifier_hash = Fr::from_u256(U256::from_u32(&env, 7));
+    let withdrawn_value = Fr::from_u256(U256::from_u32(&env, 1_000_000_000));
+    let state_root = Fr::from_u256(U256::from_u32(&env, 2));
+    let association_root = Fr::from_u256(U256::from_u32(&env, 3));
+
+    // Index 0..3 MUST match circuits/main.circom (output then public inputs).
+    let signals = PublicSignals {
+        pub_signals: Vec::from_array(
+            &env,
+            [
+                nullifier_hash,
+                withdrawn_value,
+                state_root,
+                association_root,
+            ],
+        ),
+    };
+
+    let encoded = signals.to_bytes(&env);
+    assert_eq!(encoded.len(), 4 + 4 * 32);
+
+    let mut hdr = [0u8; 4];
+    encoded.slice(0..4).copy_into_slice(&mut hdr);
+    assert_eq!(hdr, [0u8, 0u8, 0u8, 4u8], "length prefix must be u32 BE n=4");
+
+    // withdrawnValue at index 1 → byte offset 4+32.
+    let mut wv = [0u8; 32];
+    encoded.slice((4 + 32)..(4 + 64)).copy_into_slice(&mut wv);
+    assert_eq!(
+        &wv[28..32],
+        &[0x3b, 0x9a, 0xca, 0x00],
+        "withdrawnValue 1000000000 must be big-endian at signal index 1"
+    );
+    assert!(wv[..28].iter().all(|b| *b == 0));
+
+    // nullifierHash at index 0 → low byte 7 at offset 4+31.
+    let mut nh = [0u8; 32];
+    encoded.slice(4..(4 + 32)).copy_into_slice(&mut nh);
+    assert_eq!(nh[31], 7);
+
+    let roundtrip = PublicSignals::from_bytes(&env, &encoded).unwrap();
+    assert_eq!(signals.pub_signals, roundtrip.pub_signals);
+    assert_eq!(roundtrip.pub_signals.len(), 4);
+}
+
+/// Spec: docs/public-signal-serialization.md — Disclosure public order
+/// [nullifierHash, commitment, discloseHash, auditorTag].
+#[test]
+fn test_disclosure_public_signal_order_encoding() {
+    let env = Env::default();
+
+    let nullifier_hash = Fr::from_u256(U256::from_u32(&env, 11));
+    let commitment = Fr::from_u256(U256::from_u32(&env, 22));
+    let disclose_hash = Fr::from_u256(U256::from_u32(&env, 33));
+    let auditor_tag = Fr::from_u256(U256::from_u32(&env, 44));
+
+    let signals = PublicSignals {
+        pub_signals: Vec::from_array(
+            &env,
+            [nullifier_hash, commitment, disclose_hash, auditor_tag],
+        ),
+    };
+
+    let encoded = signals.to_bytes(&env);
+    assert_eq!(encoded.len(), 4 + 4 * 32);
+
+    let mut hdr = [0u8; 4];
+    encoded.slice(0..4).copy_into_slice(&mut hdr);
+    assert_eq!(hdr, [0, 0, 0, 4]);
+
+    for (idx, expected_low) in [(0u32, 11u8), (1, 22), (2, 33), (3, 44)] {
+        let start = 4 + idx * 32;
+        let mut lane = [0u8; 32];
+        encoded
+            .slice(start..(start + 32))
+            .copy_into_slice(&mut lane);
+        assert!(lane[..31].iter().all(|b| *b == 0));
+        assert_eq!(lane[31], expected_low, "disclosure signal index ordering mismatch");
+    }
+
+    // Exact-length rule: trailing garbage → MalformedPublicSignals.
+    let mut bloated = encoded.clone();
+    bloated.append(&Bytes::from_array(&env, &[0xffu8]));
+    assert_eq!(
+        PublicSignals::from_bytes(&env, &bloated).err(),
+        Some(Groth16Error::MalformedPublicSignals)
+    );
+
+    let roundtrip = PublicSignals::from_bytes(&env, &encoded).unwrap();
+    assert_eq!(signals.pub_signals, roundtrip.pub_signals);
+}
