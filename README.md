@@ -24,6 +24,11 @@ black-box mixer.
 > for what the proofs prove, what they do not prove, the anchor/off-ramp mock
 > status, and the legal caveats.
 
+## Ownership
+
+Area ownership and review routing notes live in [`docs/OWNERSHIP.md`](docs/OWNERSHIP.md).
+A `.github/CODEOWNERS` file is intentionally omitted until real maintainer handles are published.
+
 ## Live Testnet Deployment
 
 - Contract: `CDXLQFYQJVDXBZDI5QVYRAM5TGPMZQWS424FCQWYVNGSKSSHPU6XXAXT`
