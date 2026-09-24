@@ -184,6 +184,10 @@ Regression tests cover:
 - Disclosure verifier malformed inputs.
 - Withdraw rejecting non-canonical public signals without storing a nullifier.
 
+The full byte layout (Proof, PublicSignals length prefix, endianness, field
+modulus, rejection cases, and withdrawal/disclosure signal order) is specified in
+[Public Signal Serialization](docs/public-signal-serialization.md).
+
 ## circom2soroban Conversion Audit
 
 `cli/circom2soroban` is the bridge that turns snarkjs Groth16 artifacts into the
@@ -334,6 +338,8 @@ cli/circom2soroban/        snarkjs artifact conversion
 cli/coinutils/             note generation and witness input generation
 circuits/main.circom       withdrawal proof circuit
 circuits/disclosure.circom selective-disclosure receipt circuit
+docs/public-signal-serialization.md
+                           Proof/PublicSignals wire format + signal order
 scripts/live_testnet_e2e.ps1
 site/                      Supabase-authenticated web app
 supabase/migrations/       Profiles table, trigger, and RLS policies
@@ -345,6 +351,8 @@ For the full accounting of what the proofs do and do not guarantee — including
 why the receipt does not prove recipient/purpose were committed at deposit
 time, the zero-root association bypass, and the trusted-setup caveat — see
 [Privacy & Compliance Limitations](docs/privacy-compliance-limitations.md).
+For Proof / PublicSignals wire bytes and circuit signal ordering, see
+[Public Signal Serialization](docs/public-signal-serialization.md).
 
 - Fiat on-ramp and INR off-ramp are product-story stubs, not live anchor
   integrations.
