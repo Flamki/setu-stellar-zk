@@ -1,0 +1,20 @@
+name: circuits-ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build-script-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Bash syntax
+        run: bash -n scripts/build-circuits.sh scripts/disclosure_e2e.sh
+      - name: Help screen
+        run: bash scripts/build-circuits.sh --help
+      - name: Dry run (no toolchain required)
+        run: bash scripts/build-circuits.sh --dry-run --all
