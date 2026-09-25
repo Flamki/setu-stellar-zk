@@ -237,6 +237,32 @@ convenience check, not a hermetic environment validator: it only reads
 version strings from whatever is already on PATH (or already `npm install`ed
 for `snarkjs`/`circomlib`), it doesn't install or sandbox anything.
 
+### Regenerate circuit artifacts
+
+One command rebuilds both circuit artifact sets (withdrawal and selective
+disclosure) from a fresh clone:
+
+```bash
+bash scripts/build-circuits.sh
+```
+
+It writes the withdrawal compile output to `circuits/build`, the withdrawal
+Groth16 dev setup to `circuits/output` (`main_final.zkey`,
+`main_verification_key.json`), and the disclosure artifacts to
+`circuits/build_disc`. All three directories are gitignored.
+
+Options: `--main` / `--disclosure` / `--all` (default), `--clean` (delete the
+generated directories first), `--check` (prerequisites only, builds nothing),
+`--dry-run`, and `--pot-power N`. The script fails immediately with install
+hints when `circom`, `snarkjs`, or `circomlib` is missing, and it records the
+exact `circom` / `snarkjs` / `circomlib` versions it used in a `versions.txt`
+next to each artifact set.
+
+Prototype limit: the Groth16 setup this writes is a **single-contributor local
+dev setup**, not a production trusted-setup ceremony. Do not ship these as
+production keys; see
+[Privacy & Compliance Limitations](docs/privacy-compliance-limitations.md).
+
 Install JS dependencies from the parent workspace if needed:
 
 ```powershell
