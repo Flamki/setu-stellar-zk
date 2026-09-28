@@ -3,10 +3,10 @@ use super::*;
 use ark_bls12_381::{Fq, Fq2};
 use ark_serialize::CanonicalSerialize;
 use core::str::FromStr;
-use soroban_sdk::testutils::Address as TestAddress;
+use soroban_sdk::testutils::{Address as TestAddress, Events};
 use soroban_sdk::{
     crypto::bls12_381::{Fr, G1Affine, G2Affine, G1_SERIALIZED_SIZE, G2_SERIALIZED_SIZE},
-    symbol_short, vec, Address, Bytes, BytesN, Env, String, U256,
+    symbol_short, vec, Address, Bytes, BytesN, Env, IntoVal, String, U256, Val,
 };
 
 // Mock token contract for testing
@@ -1117,4 +1117,108 @@ fn test_verify_disclosure_rejects_unspent_nullifier() {
     // Verify side effects
     assert_eq!(token_client.balance(&contract_id), 1000000000); // the deposited commitment is still in contract
     assert_eq!(client.get_nullifiers().len(), 0); // nullifiers list is empty
+}
+
+// ════════════════════════════════════════════════════════════════════
+//  Verification-key commitments (issue #5)
+// ════════════════════════════════════════════════════════════════════
+
+/// Independent local mirror of the contract's scheme, so no assertion below
+/// compares the contract against a value the contract itself produced.
+fn expected_commitment(env: &Env, domain: &[u8], key: &Bytes) -> BytesN<32> {
+    let mut preimage = Bytes::from_slice(env, domain);
+    preimage.append(key);
+    env.crypto().sha256(&preimage).to_bytes()
+}
+
+#[test]
+fn test_vk_commitment_matches_recomputed_sha256() {
+    let env = Env::default();
+    let (_token_id, contract_id, _admin) = setup_test_environment(&env);
+    let client = PrivacyPoolsContractClient::new(&env, &contract_id);
+
+    let expected = expected_commitment(&env, b"setu:vk-commitment:v1", &init_vk(&env));
+    assert_eq!(client.get_vk_commitment(), Some(expected));
+}
+
+#[test]
+fn test_vk_commitment_is_stable_across_reads() {
+    let env = Env::default();
+    let (_token_id, contract_id, _admin) = setup_test_environment(&env);
+    let client = PrivacyPoolsContractClient::new(&env, &contract_id);
+
+    let first = client.get_vk_commitment();
+    let second = client.get_vk_commitment();
+    assert_eq!(first, second);
+    assert!(first.is_some(), "the constructor always installs a key");
+}
+
+#[test]
+fn test_vk_commitment_changes_with_the_installed_key() {
+    let env = Env::default();
+    let (_token_id, contract_id, _admin) = setup_test_environment(&env);
+    let client = PrivacyPoolsContractClient::new(&env, &contract_id);
+
+    let token_id = env.register(MockToken, ());
+    let admin = Address::generate(&env);
+    let other_id = env.register(
+        PrivacyPoolsContract,
+        (
+            Bytes::from_slice(&env, b"a-different-verification-key"),
+            token_id,
+            admin,
+        ),
+    );
+    let other = PrivacyPoolsContractClient::new(&env, &other_id);
+
+    assert_ne!(client.get_vk_commitment(), other.get_vk_commitment());
+}
+
+#[test]
+fn test_disclosure_vk_commitment_is_none_until_installed() {
+    let env = Env::default();
+    let (_token_id, contract_id, _admin) = setup_test_environment(&env);
+    let client = PrivacyPoolsContractClient::new(&env, &contract_id);
+
+    assert_eq!(client.has_disclosure_vk(), false);
+    assert_eq!(client.get_disclosure_vk_commitment(), None);
+}
+
+#[test]
+fn test_disclosure_vk_commitment_is_domain_separated_from_withdrawal_vk() {
+    let env = Env::default();
+    let (_token_id, contract_id, admin) = setup_test_environment(&env);
+    let client = PrivacyPoolsContractClient::new(&env, &contract_id);
+    env.mock_all_auths();
+
+    // Install the *same* key bytes the pool already holds for withdrawals.
+    let vk = init_vk(&env);
+    client.set_disclosure_vk(&admin, &vk);
+
+    let expected = expected_commitment(&env, b"setu:dvk-commitment:v1", &vk);
+    assert_eq!(client.get_disclosure_vk_commitment(), Some(expected));
+    assert_ne!(
+        client.get_vk_commitment(),
+        client.get_disclosure_vk_commitment(),
+        "identical key bytes in different slots must not share a commitment"
+    );
+}
+
+#[test]
+fn test_set_disclosure_vk_emits_exactly_one_event() {
+    let env = Env::default();
+    let (_token_id, contract_id, admin) = setup_test_environment(&env);
+    let client = PrivacyPoolsContractClient::new(&env, &contract_id);
+    env.mock_all_auths();
+
+    // `all()` drains the event log, so this counts only what the call emits.
+    let before = env.events().all().events().len();
+    client.set_disclosure_vk(&admin, &init_vk(&env));
+    let after = env.events().all().events().len();
+
+    assert_eq!(
+        after,
+        before + 1,
+        "set_disclosure_vk must publish exactly one (\"dvk\", \"set\") commitment event"
+    );
 }

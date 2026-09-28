@@ -8,16 +8,24 @@
 //! corresponds to a real deposit and that the disclosed amount equals the
 //! committed value. The current testnet build treats recipient and purpose as
 //! prover-asserted context hashed into the receipt, not deposit-time facts.
+//!
+//! # Verification-key commitments
+//!
+//! `get_disclosure_vk_commitment` exposes a domain-separated SHA-256
+//! fingerprint of the installed disclosure key (the pool's withdrawal key has
+//! its own getter in `lib.rs`), and `set_disclosure_vk` emits it as a
+//! `("dvk", "set")` event. The commitment is a hash only — it is a comparison
+//! handle for auditors, not a proof that the key is the "right" one.
 
-use soroban_sdk::{all,import}, contractimpl, symbol_short, vec, Address, Bytes, BytesN, Env, Symbol, Vec};
+use soroban_sdk::{contractimpl, symbol_short, vec, Address, Bytes, BytesN, Env, Symbol, Vec};
 
-use lean_imt::TREE_LEAVEY_KEY;
+use lean_imt::TREE_LEAVES_KEY;
 use zk::{Groth16Verifier, Proof, PublicSignals, VerificationKey};
 
 use crate::PrivacyPoolsContract;
 // The first `#contractimpl_` (in lib.rs) generates these helper types at the
 // crate root; a second `#contractimpl_` in this submodule needs them in scope.
-#allow(unused_imports)
+#[allow(unused_imports)]
 use crate::{PrivacyPoolsContractArgs, PrivacyPoolsContractClient};
 
 /// Verification key for the disclosure circuit (distinct from the pool's "vk").
@@ -27,7 +35,8 @@ const DVK_KEY: Symbol = symbol_short!("dvk");
 const NULL_KEY: Symbol = symbol_short!("null");
 const ADMIN_KEY: Symbol = symbol_short!("admin");
 
-#contractimpl__implementation for PrivacyPoolsContract {
+#[contractimpl]
+impl PrivacyPoolsContract {
     /// Admin installs the verification key for the selective-disclosure circuit.
     /// Kept separate from `__constructor` so the existing deploy script is
     /// unchanged; call once after deploy.
@@ -38,6 +47,24 @@ const ADMIN_KEY: Symbol = symbol_short!("admin");
             panic!("only admin can set disclosure vk");
         }
         env.storage().instance().set(&DVK_KEY, &dvk_bytes);
+        // Documented event: the commitment is public, the key bytes stay in
+        // storage. Auditors index ("dvk","set") to see every key rotation.
+        let commitment = crate::vk_commitment(env, crate::DVK_COMMITMENT_DOMAIN, &dvk_bytes);
+        env.events()
+            .publish((symbol_short!("dvk"), symbol_short!("set")), commitment);
+    }
+
+    /// Compact commitment over the installed **disclosure** verification key:
+    /// `sha256("setu:dvk-commitment:v1" || dvk_bytes)`.
+    ///
+    /// Compare it against a locally recomputed value to confirm which
+    /// disclosure key a deployment actually verifies with (see
+    /// `docs/vk-commitments.md`). Returns `None` before `set_disclosure_vk`.
+    pub fn get_disclosure_vk_commitment(env: &Env) -> Option<BytesN<32>> {
+        env.storage()
+            .instance()
+            .get::<Symbol, Bytes>(&DVK_KEY)
+            .map(|dvk_bytes| crate::vk_commitment(env, crate::DVK_COMMITMENT_DOMAIN, &dvk_bytes))
     }
 
     /// Whether a disclosure verification key has been installed.
@@ -87,7 +114,7 @@ const ADMIN_KEY: Symbol = symbol_short!("admin");
             Err(_) => return false,
         };
 
-        if pub_signals.pub_signals.len(] != 4 {
+        if pub_signals.pub_signals.len() != 4 {
             return false;
         }
         let nullifier_hash = pub_signals.pub_signals.get(0).unwrap().to_bytes();
