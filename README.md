@@ -343,6 +343,20 @@ npm run dev
 If the variables are missing, the auth forms stay disabled and the page shows a
 configuration warning instead of opening an unauthenticated workspace.
 
+## Verification Key Commitments
+
+The pool stores its Groth16 verification keys as opaque bytes, so an auditor had
+no cheap way to check which key a deployment verifies with. The contract now
+exposes a domain-separated SHA-256 commitment for each key —
+`get_vk_commitment()` for the withdrawal key and
+`get_disclosure_vk_commitment()` for the disclosure key — and
+`set_disclosure_vk` emits the commitment as a `("dvk", "set")` event.
+
+A commitment is a comparison handle, not a proof: it confirms the key you hold is
+the key the contract holds, and says nothing about whether the setup behind it
+was trustworthy. Recompute it locally from the circuit artifacts and compare —
+see [Verification Key Commitments](docs/vk-commitments.md).
+
 ## Site CI
 
 `.github/workflows/site-ci.yml` runs `npm run smoke` in `site/` on pushes to
@@ -391,6 +405,7 @@ cli/circom2soroban/        snarkjs artifact conversion
 cli/coinutils/             note generation and witness input generation
 circuits/main.circom       withdrawal proof circuit
 circuits/disclosure.circom selective-disclosure receipt circuit
+docs/vk-commitments.md   VK commitment scheme + how to recompute it
 docs/public-signal-serialization.md
                            Proof/PublicSignals wire format + signal order
 scripts/live_testnet_e2e.ps1

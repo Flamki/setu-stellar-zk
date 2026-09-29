@@ -44,11 +44,32 @@ const TREE_DEPTH: u32 = 20;
 // Storage keys
 const NULL_KEY: Symbol = symbol_short!("null");
 const VK_KEY: Symbol = symbol_short!("vk");
+
+/// Domain tags for the verification-key commitments. The tag is hashed in front
+/// of the key bytes, so the same key installed in two different slots yields two
+/// different commitments: a withdrawal-key commitment can never be confused with
+/// a disclosure-key commitment, even when the key bytes are identical.
+pub(crate) const VK_COMMITMENT_DOMAIN: &[u8] = b"setu:vk-commitment:v1";
+pub(crate) const DVK_COMMITMENT_DOMAIN: &[u8] = b"setu:dvk-commitment:v1";
 const TOKEN_KEY: Symbol = symbol_short!("token");
 const ASSOCIATION_ROOT_KEY: Symbol = symbol_short!("assoc");
 const ADMIN_KEY: Symbol = symbol_short!("admin");
 
 const FIXED_AMOUNT: i128 = 1000000000; // 1 XLM in stroops
+
+/// `sha256(domain || vk_bytes)` over the exact bytes held in storage.
+///
+/// A commitment is a *fingerprint*, not a proof of correctness: it lets an
+/// auditor compare the installed key against a repo artifact without trusting
+/// this contract's storage, and it reveals nothing the key bytes do not already
+/// imply. Collision resistance of SHA-256 means two different keys can never
+/// share a commitment, and the domain tag means two different slots can never
+/// share one either.
+pub(crate) fn vk_commitment(env: &Env, domain: &[u8], vk_bytes: &Bytes) -> BytesN<32> {
+    let mut preimage = Bytes::from_slice(env, domain);
+    preimage.append(vk_bytes);
+    env.crypto().sha256(&preimage).to_bytes()
+}
 
 #[contract]
 pub struct PrivacyPoolsContract;
@@ -416,5 +437,21 @@ impl PrivacyPoolsContract {
     /// * The address of the admin (contract deployer)
     pub fn get_admin(env: &Env) -> Address {
         env.storage().instance().get(&ADMIN_KEY).unwrap()
+    }
+
+    /// Compact commitment over the **withdrawal** verification key installed by
+    /// `__constructor`: `sha256("setu:vk-commitment:v1" || vk_bytes)`.
+    ///
+    /// An auditor recomputes the same 32 bytes locally from the repo's
+    /// `vk.json` / circuit artifact and compares them with this value (see
+    /// `docs/vk-commitments.md`). Returns `None` when no key is installed.
+    ///
+    /// PRIVACY: the commitment is a hash, so publishing or reading it reveals
+    /// nothing about the key beyond its identity.
+    pub fn get_vk_commitment(env: &Env) -> Option<BytesN<32>> {
+        env.storage()
+            .instance()
+            .get::<Symbol, Bytes>(&VK_KEY)
+            .map(|vk_bytes| vk_commitment(env, VK_COMMITMENT_DOMAIN, &vk_bytes))
     }
 }
