@@ -1,6 +1,6 @@
 # Ownership notes
 
-Setu does not yet publish a `.github/CODEOWNERS` file.
+Cetu does not yet publish a .github/CODEOWNERS file.
 
 GitHub CODEOWNERS entries require **real, write-permissioned** user or team
 handles. Inventing `@handles` would route review requests incorrectly and fail

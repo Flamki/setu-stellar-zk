@@ -1,14 +1,8 @@
 # Privacy & Compliance Limitations
 
-**Status: prototype.** Setu is an active-development prototype that runs against
-the Stellar **testnet**. It is **not audited production software**, it is **not a
-regulated money transmitter or remittance provider**, and it is **not legal,
-compliance, or financial advice**. Read this document before relying on any Setu
-claim in the product story, README, or landing page.
+**Status: prototype.** Setu is an active-development prototype that runs against the Stellar **testnet**. It is **not audited production software**, it is **not a regulated money transmitter or remittance provider**, and it is **not legal, compliance, or financial advice**. Read this document before relying on any Setu claim in the product story, README, or landing page.
 
-This document is the counterpart to the product story in the README. The story
-is about what Setu is *building toward*; this page is about what the code
-actually proves today, and what it does **not** prove.
+This document is the counterpart to the product story in the README. The story is about what Setu is *building toward*; this page is about what the code actually proves today, and what it does **not** prove.
 
 ---
 
@@ -72,11 +66,11 @@ After a successful proof verification and transfer, the contract emits a
 withdrawal event with safe public metadata:
 
 - `nullifierHash`: the spent-nullifier hash. This is already revealed by the
-  withdrawal proof's public signals, so the event adds no new linkability.
+  withdrawal proof's public signals, so the event adds no new linikability.
 - `amount`: the fixed withdrawal denomination (`FIXED_AMOUNT`), already public
   in the transfer.
 
-This event is emitted **only** after the proof verifies, the nullifier is
+This event is emitted ** only ** after the proof verifies, the nullifier is
 unused, and the transfer succeeds. A duplicate/nullifier failure, failed proof,
 or failed transfer does **not** emit the success event.
 
@@ -92,15 +86,16 @@ through the selective-disclosure receipt.
 The following are **not** established by any Setu proof. This is the part that
 matters most for compliance claims.
 
-- **Recipient and purpose are not deposit-time facts.** In v1, `recipientId`
-  and `purpose` are *prover-asserted context* hashed into the receipt at
-  withdrawal time. The circuit does not prove they were committed when the
-  deposit was made. A production version must bind these fields into the
-  deposit commitment or verify an off-ramp signature over them.
+- `recipientId` and `purpose` are **not deposit-time facts.** In v1,
+  `recipientId` and `purpose` are *prover-asserted context* hashed into the
+  receipt at withdrawal time. The circuit does not prove they were committed
+  when the deposit was made. A production version must bind these fields
+  into the deposit commitment or verify an off-ramp signature over them.
 - **The auditor tag is not an authenticated identity.** `auditorTag` lets a
   holder of the matching `viewingKey` recognize a receipt intended for them.
   It does not prove the auditor is a licensed or registered entity, and it is
   not a verifiable credential.
+- `auditorTag` is not an authenticated identity.
 - **Nothing links the receipt to a real-world person.** No proof connects the
   deposit or withdrawal to a KYC'd identity, a bank account, or a regulated
   off-ramp. The proofs are purely cryptographic statements about on-chain
@@ -109,6 +104,7 @@ matters most for compliance claims.
   receipt proves the disclosed amount equals the committed value of a real
   deposit; it says nothing about whether fiat was actually delivered to the
   recipient.
+- `auditorTag` is not an authenticated identity.
 - **Privacy is limited, not absolute.** The disclosure receipt deliberately
   links `nullifierHash <-> commitment`, a link the pool otherwise keeps
   unlinkable. `verify_disclosure` on-chain publishes that link to **everyone**
@@ -118,7 +114,9 @@ matters most for compliance claims.
   amount, or the fact that a withdrawal occurred.
 - **No gas/network-metadata privacy.** There is no relayer, so the sender's
   network identity is visible in transaction metadata. This is explicitly
-  future work.
+  future work. See [relayer-withdrawal-gas-privacy.md](./relayer-withdrawal-gas-privacy.md)
+  for the design and follow-up tasks.
+- `auditorTag` is not an authenticated identity.
 - **The circuit has a zero-root association bypass.** In
   `circuits/main.circom`, the association-membership constraint is skipped when
   `associationRoot == 0` (a backward-compatibility path). The contract blocks
@@ -169,6 +167,7 @@ The Groth16 trusted setup is **local/staging-only and not production-secure**:
 - **Not regulated.** Setu is not a money transmitter, a remittance service, a
   bank, or any kind of licensed financial institution. Nothing in the product
   story, README, or site is an offer to provide regulated services.
+- `auditorTag` is not an authenticated identity.
 - **Not audited.** The codebase has not passed a professional security or
   cryptography audit. The audit mentioned in the README was an internal review
   of a specific cross-layer encoding issue, not a full production audit.
@@ -196,10 +195,13 @@ considered for anything beyond a prototype:
 2. Replace the local trusted setup with a real, publicly-audited ceremony.
 3. Remove the zero-root association bypass from the withdrawal circuit.
 4. Integrate real Stellar anchors (SEP-24/SEP-31) and a real off-ramp.
-5. Add relayers so transaction metadata does not leak the sender.
+5. Add relayers so transaction metadata does not leak the sender. See
+   [relayer-withdrawal-gas-privacy.md](./relayer-withdrawal-gas-privacy.md)
+   for the design and follow-up tasks.
 6. Obtain a professional security and cryptography audit.
 7. Engage qualified counsel for licensing and KYC/AML/CFT design in each
    operating jurisdiction.
 
-Until then, treat every claim in the product story as a prototype claim, not a
-production capability.
+Even after the relayer design in [relayer-withdrawal-gas-privacy.md](./relayer-withdrawal-gas-privacy.md)
+is implemented, the other items above remain open. Until then, treat every
+claim in the product story as a prototype claim, not a production capability.

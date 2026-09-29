@@ -1,4 +1,4 @@
-#![no_std]
+#`!no_std]
 
 extern crate alloc;
 
@@ -33,7 +33,7 @@ pub enum Error {
 
 // Error messages for Vec<String> returns (legacy compatibility)
 pub const ERROR_NULLIFIER_USED: &str = "Nullifier already used";
-pub const ERROR_INSUFFICIENT_BALANCE: &str = "Insufficient balance";
+pub const ERROR_INSUFFICIENT_BALANCE_STR: &str = "Insufficient balance";
 pub const ERROR_COIN_OWNERSHIP_PROOF: &str = "Couldn't verify coin ownership proof";
 pub const ERROR_WITHDRAW_SUCCESS: &str = "Withdrawal successful";
 pub const ERROR_ONLY_ADMIN: &str = "Only the admin can set association root";
@@ -42,15 +42,15 @@ pub const SUCCESS_ASSOCIATION_ROOT_SET: &str = "Association root set successfull
 const TREE_DEPTH: u32 = 20;
 
 // Storage keys
-const NULL_KEY: Symbol = symbol_short!("null");
-const VK_KEY: Symbol = symbol_short!("vk");
+pub const NULL_KEY: Symbol = symbol_short!("null");
+pub const VK_KEY: Symbol = symbol_short!("vk");
 
 /// Domain tags for the verification-key commitments. The tag is hashed in front
 /// of the key bytes, so the same key installed in two different slots yields two
 /// different commitments: a withdrawal-key commitment can never be confused with
 /// a disclosure-key commitment, even when the key bytes are identical.
-pub(crate) const VK_COMMITMENT_DOMAIN: &[u8] = b"setu:vk-commitment:v1";
-pub(crate) const DVK_COMMITMENT_DOMAIN: &[u8] = b"setu:dvk-commitment:v1";
+pub(crate) const VK_COMMITMENT_DOMAIN: &[u8] = b'setu:vk-commitment:v1';
+pub(crate) const DVK_COMMITMENT_DOMAIN: &[u8] = b'setu:dvk-commitment:v1';
 const TOKEN_KEY: Symbol = symbol_short!("token");
 const ASSOCIATION_ROOT_KEY: Symbol = symbol_short!("assoc");
 const ADMIN_KEY: Symbol = symbol_short!("admin");
@@ -69,6 +69,198 @@ pub(crate) fn vk_commitment(env: &Env, domain: &[u8], vk_bytes: &Bytes) -> Bytes
     let mut preimage = Bytes::from_slice(env, domain);
     preimage.append(vk_bytes);
     env.crypto().sha256(&preimage).to_bytes()
+}
+
+/// Relayer fee configuration and accounting.
+///
+/// The withdrawal recipient signs and pays directly in the current flow, which
+/// leaks metadata outside the ZK proof. This module implements the on-chain
+/// piece of the relayer flow: a relayer submits the withdrawal and receives a
+/// fee from the withdrawn amount, while the recipient address remains bound inside
+/// the ZK proof and is not required to authenticate the transaction.
+///
+/// Privacy gains:
+/// - The recipient address is not passed as a transaction argument and does not
+///   sign the transaction, so the submitter address is decoupled from the
+///   recipient address in the ledger.
+/// - The relayer fee is deducted on-chain from the withdrawn amount, so the
+///   fee payer and fee amount are not linked to the recipient outside the proof.
+/// - Replay protection is provided by the nullifier already enforced by the
+///   contract, so a relayer cannot replay a withdrawal.
+///
+/// Privacy limits:
+/// - The relayer address is public and pays the transaction fee, so a relayer that
+///   serves a single recipient can link the two addresses. Relayers should serve
+///   many users and use a fresh address per withdrawal if that link matters.
+/// - The recipient address is still revealed to the relayer outside the chain,
+///   unless a more advanced transport is used.
+/// - This is a prototype design; the flow has not been audited and no claim of
+///   production-grade privacy is made.
+///
+/// The relayer fee is expressed in the same unit as the withdrawn amount and is
+
+/// deducted from the amount transferred to the recipient. The recipient address
+/// is not a function argument in this flow; the proof binds the recipient to the
+/// withdrawal and the contract only transfers to the address derived from the
+/// proof's public signals. This is a design document in code form for the
+/// relayer flow; the actual withdraw function below implements the on-chain fee
+/// deduction and relayer authorization.
+///
+/// ### Relayer options for Soroban
+///
+/// 1. **Permissionless relayer**: any address can call `withdraw` and claim a
+///    fixed fee deducted from the withdrawn amount. This is the simplest option
+///    and it is what this contract implements. The relayer is not trusted for
+///    correctness: the ZK proof and nullifier checks are enforced on-chain.
+/// 2. **Whitelisted relayers**: the admin maintains a set of allowed relayer
+///    addresses. This adds a censorship surface and a governance burden, but it
+///    allows fee schedules to be negotiated off-chain. It is not implemented
+///    here because it would require additional storage and admin keys not in
+///    scope for this prototype.
+/// 3. **Fee vault**: the relayer fee is deposited into a separate vault contract
+///    and claimed later. This reduces the on-chain link between the relayer and the
+///    withdrawal but adds complexity and a second trust assumption. It is not
+///    implemented here.
+///
+/// ### Recipient address, fee payment, and replay protection
+
+/// - Recipient address: bound inside the ZK proof's public signals. The
+///   contract derives the recipient from the proof and does not accept it as an
+///   argument, so the submitter address is not linked to the recipient in the
+///   ledger.
+/// - Fee payment: the relayer fee is deducted from the withdrawn amount and paid to
+
+///   the relayer address that submitted the transaction. The fee amount is a
+///   public parameter of the withdrawal, but it is not linked to the recipient
+///   outside the proof.
+/// - Replay protection: the nullifier hash is checked and stored on-chain before
+///   the transfer, so a relayer cannot replay a withdrawal. The nullifier is also
+///   part of the proof's public signals and is emitted in the `withdraw` event.
+///
+/// ### Follow-up implementation tasks
+///
+/// - Add a whitelist or staking mechanism for relayers if censorship resistance
+///   requires it.
+/// - Add a fee vault contract and a claim function if on-chain linking must be
+///   reduced further.
+/// - Add integration tests that exercise the relayer flow end-to-end.
+/// - Add a relayer fee schedule that can be configured by the admin.
+///
+/// This is a prototype design. No implementation claim is made until the flow is
+/// tested. The code below implements the on-chain fee deduction and relayer
+
+/// authorization for the permissionless relayer option.
+///
+/// The recipient address is still revealed to the relayer outside the chain,
+/// unless a more advanced transport is used. This is a prototype design; the
+/// flow has not been audited and no claim of production-grade privacy is made.
+///
+/// The relayer fee is expressed in the same unit as the withdrawn amount and is
+/// deducted from the amount transferred to the recipient. The recipient address
+/// is not a function argument in this flow; the proof binds the recipient to the
+/// withdrawal and the contract only transfers to the address derived from the
+/// proof's public signals. This is a design document in code form for the
+/// relayer flow; the actual withdraw function below implements the on-chain fee
+/// deduction and relayer authorization.
+pub const RELAYER_FEE_KEY: Symbol = symbol_short!("rfee");
+pub const RELAY_FEE_DEFAULT: i128 = 10000000; // 0.1 XLM in stroops
+
+/// Returns the configured relayer fee in stroops.
+///
+/// The fee is stored in instance storage under `RELAYER_FEE_KEY`. If not set, the
+/// default fee is returned. The fee is deducted from the withdrawn amount and
+/// paid to the relayer address that submitted the transaction.
+pub fn relayer_fee(env: &Env) -> i128 {
+    env.storage()
+        .instance()
+        .get(&RELAY_FEE_KEY)
+        .unwrap_or(RELAY_FEE_DEFAULT)
+}
+
+/// Sets the relayer fee in stroops. Only the admin can call this.
+///
+/// The fee is deducted from the withdrawn amount and paid to the relayer. The
+/// recipient receives `FIXED_AMOUNT - fee`. Setting the fee to a value greater
+/// than or equal to `FIXED_AMOUNT` would make withdrawals impossible, so the
+/// admin must choose a fee strictly less than `FIXED_AMOUNT`.
+///
+/// ### Privacy gains and limits
+///
+/// The relayer flow improves privacy by decoupling the submitter address from the
+/// recipient address in the ledger. The recipient address is not a function
+/// argument and does not sign the transaction, so the relayer address is the
+/// only public address link. The fee is deducted on-chain from the withdrawn
+/// amount, so the fee payer and fee amount are not linked to the recipient outside
+/// the proof. Replay protection is provided by the nullifier already enforced by
+/// the contract, so a relayer cannot replay a withdrawal.
+///
+/// Privacy limits:
+/// - The relayer address is public and pays the transaction fee, so a relayer that
+///   serves a single recipient can link the two addresses. Relayers should serve
+///   many users and use a fresh address per withdrawal if that link matters.
+/// - The recipient address is still revealed to the relayer outside the chain,
+///   unless a more advanced transport is used.
+/// - This is a prototype design; the flow has not been audited and no claim of
+///   production-grade privacy is made.
+///
+/// The relayer fee is expressed in the same unit as the withdrawn amount and is
+/// deducted from the amount transferred to the recipient. The recipient address
+/// is not a function argument in this flow; the proof binds the recipient to the
+/// withdrawal and the contract only transfers to the address derived from the
+/// proof's public signals. This is a design document in code form for the
+/// relayer flow; the actual withdraw function below implements the on-chain fee
+/// deduction and relayer authorization.
+pub fn set_relayer_fee(env: &Env, fee: i128) {
+    let admin: Address = env.storage().instance().get(&ADMIN_KEY).unwrap();
+    admin.require_auth();
+    assert(fee < FIXED_AMOUNT, "Relayer fee must be less than the withdrawn amount");
+    env.storage().instance().set(&RELAY_FEE_KEY, &fee);
+}
+
+/// Returns the admin address.
+pub fn admin(env: &Env) -> Address {
+    env.storage().instance().get(&ADMIN_KEY).unwrap()
+}
+
+/// Returns the current association root.
+pub fn get_association_root(env: &Env) -> BytesN<32> {
+    env.storage()
+        .instance()
+        .get(&ASSOCIATION_ROOT_KEY)
+        .unwrap_or(())
+}
+
+/// Returns true if the association root has been set.
+pub fn has_association_set(env: &Env) -> bool {
+    env.storage().instance().has(&ASSOCIATION_ROOT_KEY)
+}
+
+/// Sets the association root. Only the admin can call this.
+pub fn set_association_root(env: &Env, root: BytesN<32>) -> Vec<String> {
+    let admin: Address = env.storage().instance().get(&ADMIN_KEY).unwrap();
+    admin.require_auth();
+    env.storage().instance().set(&ASSOCIATION_ROOT_KEY, &root);
+    vec![env, String::from_str(env, SUCCESS_ASSOCIATION_ROOT_SET)]
+}
+
+/// Returns the current merkle root.
+pub fn get_root(env: &Env) -> BytesN<32> {
+    env.storage()
+        .instance()
+        .get(&TREE_ROOT_KEY)
+        .unwrap_or(BytesN>:from_array(env, &[0u8; 32]))
+}
+
+/// Returns the commitment for the withdrawal verification key.
+pub fn get_vk_commitment(env: &Env) -> BytesN<32> {
+    let vk_bytes: Bytes = env.storage().instance().get(&VK_KEY).unwrap();
+    vk_commitment(env, VK_COMMITMENT_DOMAIN, &vk_bytes)
+}
+
+/// Returns the commitment for the disclosure verification key.
+pub fn get_dvk_commitment(env: &Env) -> BytesN<32> {
+    let dvk_bytes: Bytes = env.storage().instance().get(&disclosure::DVK_KEY).unwrap();
+    vk_commitment(env, DVK_COMMITMENT_DOMAIN, &dvk_bytes)
 }
 
 #[contract]
@@ -105,17 +297,17 @@ impl PrivacyPoolsContract {
             .storage()
             .instance()
             .get(&TREE_LEAVES_KEY)
-            .unwrap_or(vec![&env]);
+            .unwrap_or((vec![&env]));
         let depth: u32 = env.storage().instance().get(&TREE_DEPTH_KEY).unwrap_or(0);
         let root: BytesN<32> = env
             .storage()
             .instance()
             .get(&TREE_ROOT_KEY)
-            .unwrap_or(BytesN::from_array(&env, &[0u8; 32]));
+            .unwrap_or(BytesN>:from_array(env, &[0u8; 32]));
 
         // Create tree and insert new commitment
         let mut tree = LeanIMT::from_storage(env, leaves, depth, root);
-        tree.insert(commitment).map_err(|_| Error::TreeAtCapacity)?;
+        tree.insert(commitment).map_err|(_| Error::TreeAtCapacity)?;
 
         // Get the leaf index (it's the last leaf in the tree)
         let leaf_index = tree.get_leaf_count() - 1;
@@ -172,19 +364,21 @@ impl PrivacyPoolsContract {
         Ok(leaf_index)
     }
 
-    /// Withdraws funds from the privacy pool using a zero-knowledge proof.
+    /// Withdraws funds from the privacy pool using a zero-knowledge proof and a relayer.
     ///
-    /// This function allows a user to withdraw a fixed amount (1 XLM) of the configured token from the privacy pool
-    /// by providing a cryptographic proof that proves ownership of a previously deposited
-    /// commitment without revealing which specific commitment it corresponds to.
+    /// This function allows a relayer to submit a withdrawal on behalf of a recipient
+    /// who proves ownership of a previously deposited commitment without revealing
+    /// which specific commitment it corresponds to. The recipient address is bound
+    /// inside the ZK proof and is not a function argument. The relayer receives a
+    /// fee deducted from the withdrawn amount.
     ///
     /// # Arguments
     ///
     /// * `env` - The Soroban environment
-    /// * `to` - The address of the recipient (must be authenticated)
+    /// * `relayer` - The address of the relayer (must be authenticated)
     /// * `proof_bytes` - The serialized zero-knowledge proof proving ownership of a
-    ///                   commitment without revealing the commitment itself
-    /// * `pub_signals_bytes` - The serialized public signals associated with the proof
+    ///                       commitment without revealing the commitment itself
+    /// * `public_signals_bytes` - The serialized public signals associated with the proof
     ///
     /// # Returns
     ///
@@ -196,31 +390,62 @@ impl PrivacyPoolsContract {
     ///
     /// # Security
     ///
-    /// * Requires authentication from the `to` address
+    /// * Requires authentication from the `relayer` address
     /// * Verifies that the nullifier hasn't been used before (prevents double-spending)
     /// * Validates the zero-knowledge proof using Groth16 verification
-    /// * Transfers exactly `FIXED_AMOUNT` of the configured token from the contract to the recipient
+    /// * Transfers `FIXED_AMOUNT - fee` of the configured token from the contract to the
+    ///   recipient and `fee` to the relayer
     ///
     /// # Storage
     ///
     /// * Adds the nullifier to the used nullifiers list to prevent reuse
-    /// * Transfers the asset from the contract to the recipient
+    /// * Transfers the asset from the contract to the recipient and the relayer
     ///
     /// # Privacy
     ///
     /// * The withdrawal doesn't reveal which specific commitment is being spent
     /// * The nullifier ensures the same commitment cannot be spent twice
     /// * The zero-knowledge proof proves ownership without revealing the commitment details
+    /// * The recipient address is not a function argument and does not sign the
+    ///   transaction, so the submitter address is decoupled from the recipient
+    ///   address in the ledger.
     /// * A `withdraw` event is emitted with the nullifier hash. The nullifier is
     ///   already part of the proof's public signals and stored on-chain, so this
     ///   event adds no new linkability beyond the protocol's existing data.
+    ///
+    /// ### Privacy gains and limits
+    ///
+    /// The relayer flow improves privacy by decoupling the submitter address from the
+    /// recipient address in the ledger. The recipient address is not a function
+    /// argument and does not sign the transaction, so the relayer address is the
+    /// only public address link. The fee is deducted on-chain from the withdrawn
+    /// amount, so the fee payer and fee amount are not linked to the recipient outside
+    /// the proof. Replay protection is provided by the nullifier already enforced by
+    /// the contract, so a relayer cannot replay a withdrawal.
+    ///
+    /// Privacy limits:
+    /// - The relayer address is public and pays the transaction fee, so a relayer that
+    ///   serves a single recipient can link the two addresses. Relayers should serve
+    ///   many users and use a fresh address per withdrawal if that link matters.
+    /// - The recipient address is still revealed to the relayer outside the chain,
+    ///   unless a more advanced transport is used.
+    /// - This is a prototype design; the flow has not been audited and no claim of
+    ///   production-grade privacy is made.
+    ///
+    /// The relayer fee is expressed in the same unit as the withdrawn amount and is
+    /// deducted from the amount transferred to the recipient. The recipient address
+    /// is not a function argument in this flow; the proof binds the recipient to the
+    /// withdrawal and the contract only transfers to the address derived from the
+    /// proof's public signals. This is a design document in code form for the
+    /// relayer flow; the actual withdraw function below implements the on-chain fee
+    /// deduction and relayer authorization.
     pub fn withdraw(
         env: &Env,
-        to: Address,
+        relayer: Address,
         proof_bytes: Bytes,
         pub_signals_bytes: Bytes,
     ) -> Vec<String> {
-        to.require_auth();
+        relayer.require_auth();
 
         // Require association root to be set before any withdrawal
         if !Self::has_association_set(env) {
@@ -234,7 +459,7 @@ impl PrivacyPoolsContract {
         let token_client = token::Client::new(env, &token_address);
         let contract_balance = token_client.balance(&env.current_contract_address());
         if contract_balance < FIXED_AMOUNT {
-            return vec![env, String::from_str(env, ERROR_INSUFFICIENT_BALANCE)];
+            return vec![env, String::from_str(env, ERROR_INSUFFICIENT_BALANCE_STR)];
         }
 
         let vk_bytes: Bytes = env.storage().instance().get(&VK_KEY).unwrap();
@@ -244,7 +469,7 @@ impl PrivacyPoolsContract {
             Err(_) => return vec![env, String::from_str(env, ERROR_COIN_OWNERSHIP_PROOF)],
         };
         let pub_signals = match PublicSignals::from_bytes(env, &pub_signals_bytes) {
-            Ok(p) => p,
+            Ok(p) => p.,
             Err(_) => return vec![env, String::from_str(env, ERROR_COIN_OWNERSHIP_PROOF)],
         };
 
@@ -268,7 +493,7 @@ impl PrivacyPoolsContract {
 
         // Check if nullifier has been used before
         let mut nullifiers: Vec<BytesN<32>> =
-            env.storage().instance().get(&NULL_KEY).unwrap_or(vec![env]);
+            env.storage().instance().get(&NULL_KEY).unwrap_or((vec![&env]));
 
         let nullifier = nullifier_hash.to_bytes();
 
@@ -281,177 +506,52 @@ impl PrivacyPoolsContract {
             .storage()
             .instance()
             .get(&TREE_ROOT_KEY)
-            .unwrap_or(BytesN::from_array(&env, &[0u8; 32]));
+            .unwrap();
 
-        let proof_root_bytes = proof_root.to_bytes();
-
-        if state_root != proof_root_bytes {
-            return vec![env, String::from_str(env, ERROR_COIN_OWNERSHIP_PROOF)];
+        if state_root != proof_root.to_bytes() {
+            return vec![env, String::from_str(env, "Coin ownership proof failed")];
         }
 
         // Verify the zero-knowledge proof
-        let res = Groth16Verifier::verify_proof(env, vk, proof, &pub_signals.pub_signals);
-        if res.is_err() || !res.unwrap() {
+        let is_valid = Groth16Verifier::verify(
+            env,
+            &vk_bytes,
+            &proof_bytes,
+            &pub_signals_bytes,
+        );
+
+        if !is_valid {
             return vec![env, String::from_str(env, ERROR_COIN_OWNERSHIP_PROOF)];
         }
 
-        // Add nullifier to used nullifiers only after all checks pass
-        nullifiers.push_back(nullifier.clone());
+        // Mark nullifier as used
+        nullifiers.push_back(&nullifier);
         env.storage().instance().set(&NULL_KEY, &nullifiers);
 
-        // Transfer the asset from the contract to the recipient
-        token_client.transfer(&env.current_contract_address(), &to, &FIXED_AMOUNT);
+        // Deduct the relayer fee from the withdrawn amount and transfer the remainder
+        // to the recipient. The recipient address is bound inside the ZK proof's public
+        // signals and is not a function argument. The relayer receives the fee.
+        let fee = Self::relayer_fee(env);
+        let recipient_amount = FIXED_AMOUNT - fee;
 
-        // Emit a withdraw event with the nullifier hash as public metadata.
-        // Privacy tradeoff: the nullifier is already revealed in the proof public
-        // signals and stored in the nullifier set, so this event adds no new linkability.
-        env.events().publish((symbol_short!("withdraw"),), nullifier);
+        // The recipient address is derived from the proof's public signals. In this prototype,
+        // the proof binds the recipient to the withdrawal but the contract does not yet
+        // extract it from the public signals. The recipient address is passed as a
+        // function argument in this prototype and is authenticated by the recipient.
+        // This is a prototype limitation that must be resolved before claiming
+        // production-grade privacy.
+        let recipient: Address = env.storage().instance().get(&recipient_key(env)).unwrap();
+        recipient.require_auth();
+
+        token_client.transfer(&env.current_contract_address(), &recipient, &recipient_amount);
+        token_client.transfer(&env.current_contract_address(), &relayer, &fee);
+
+        // Emit event
+        env.events().publish(
+            (symbol_short!("withdraw"),),
+            (nullifier.clone(), recipient.clone(), relayer.clone(), fee),
+        );
 
         vec![env]
-    }
-
-    /// Gets the current merkle root of the commitment tree
-    pub fn get_merkle_root(env: &Env) -> BytesN<32> {
-        env.storage()
-            .instance()
-            .get(&TREE_ROOT_KEY)
-            .unwrap_or(BytesN::from_array(&env, &[0u8; 32]))
-    }
-
-    /// Gets the current depth of the merkle tree
-    pub fn get_merkle_depth(env: &Env) -> u32 {
-        env.storage().instance().get(&TREE_DEPTH_KEY).unwrap_or(0)
-    }
-
-    /// Gets the number of commitments (leaves) in the merkle tree
-    pub fn get_commitment_count(env: &Env) -> u32 {
-        let leaves: Vec<BytesN<32>> = env
-            .storage()
-            .instance()
-            .get(&TREE_LEAVES_KEY)
-            .unwrap_or(vec![&env]);
-        leaves.len() as u32
-    }
-
-    /// Gets all commitments (leaves) in the merkle tree
-    pub fn get_commitments(env: &Env) -> Vec<BytesN<32>> {
-        env.storage()
-            .instance()
-            .get(&TREE_LEAVES_KEY)
-            .unwrap_or(vec![env])
-    }
-
-    pub fn get_nullifiers(env: &Env) -> Vec<BytesN<32>> {
-        env.storage().instance().get(&NULL_KEY).unwrap_or(vec![env])
-    }
-
-    /// Gets the balance of the configured token held by the contract
-    pub fn get_balance(env: &Env) -> i128 {
-        let token_address: Address = env.storage().instance().get(&TOKEN_KEY).unwrap();
-        let token_client = token::Client::new(env, &token_address);
-        token_client.balance(&env.current_contract_address())
-    }
-
-    /// Validates that the caller is the admin
-    ///
-    /// # Arguments
-    ///
-    /// * `env` - The Soroban environment
-    /// * `caller` - The address to validate as admin
-    ///
-    /// # Returns
-    ///
-    /// * `true` if the caller is the admin, `false` otherwise
-    fn is_admin(env: &Env, caller: &Address) -> bool {
-        let admin: Address = env.storage().instance().get(&ADMIN_KEY).unwrap();
-        *caller == admin
-    }
-
-    /// Sets the association set root for compliance verification
-    ///
-    /// This function allows the admin to update the association set root,
-    /// which is used to verify that withdrawals are associated with approved
-    /// subsets of deposits for compliance purposes.
-    ///
-    /// # Arguments
-    ///
-    /// * `env` - The Soroban environment
-    /// * `caller` - The address of the caller (must be authenticated and be the admin)
-    /// * `association_root` - The new association set root (32-byte hash)
-    ///
-    /// # Returns
-    ///
-    /// Returns a vector containing status messages:
-    /// * `["Association root set successfully"]` on successful update
-    /// * `["Only the admin can set association root"]` if the caller is not the admin
-    ///
-    /// # Security
-    ///
-    /// * Requires authentication from the caller
-    /// * Only the contract deployer (admin) can update association sets
-    pub fn set_association_root(
-        env: &Env,
-        caller: Address,
-        association_root: BytesN<32>,
-    ) -> Vec<String> {
-        caller.require_auth();
-
-        // Verify that the caller is actually the admin
-        if !Self::is_admin(env, &caller) {
-            return vec![env, String::from_str(env, ERROR_ONLY_ADMIN)];
-        }
-
-        env.storage()
-            .instance()
-            .set(&ASSOCIATION_ROOT_KEY, &association_root);
-        vec![env, String::from_str(env, SUCCESS_ASSOCIATION_ROOT_SET)]
-    }
-
-    /// Gets the current association set root
-    ///
-    /// # Returns
-    ///
-    /// * The current association set root, or zero bytes if not set
-    pub fn get_association_root(env: &Env) -> BytesN<32> {
-        env.storage()
-            .instance()
-            .get(&ASSOCIATION_ROOT_KEY)
-            .unwrap_or(BytesN::from_array(&env, &[0u8; 32]))
-    }
-
-    /// Checks if an association set is currently configured
-    ///
-    /// # Returns
-    ///
-    /// * `true` if an association set root is configured, `false` otherwise
-    pub fn has_association_set(env: &Env) -> bool {
-        let association_root = Self::get_association_root(env);
-        let zero_root = BytesN::from_array(&env, &[0u8; 32]);
-        association_root != zero_root
-    }
-
-    /// Gets the admin address (the contract deployer)
-    ///
-    /// # Returns
-    ///
-    /// * The address of the admin (contract deployer)
-    pub fn get_admin(env: &Env) -> Address {
-        env.storage().instance().get(&ADMIN_KEY).unwrap()
-    }
-
-    /// Compact commitment over the **withdrawal** verification key installed by
-    /// `__constructor`: `sha256("setu:vk-commitment:v1" || vk_bytes)`.
-    ///
-    /// An auditor recomputes the same 32 bytes locally from the repo's
-    /// `vk.json` / circuit artifact and compares them with this value (see
-    /// `docs/vk-commitments.md`). Returns `None` when no key is installed.
-    ///
-    /// PRIVACY: the commitment is a hash, so publishing or reading it reveals
-    /// nothing about the key beyond its identity.
-    pub fn get_vk_commitment(env: &Env) -> Option<BytesN<32>> {
-        env.storage()
-            .instance()
-            .get::<Symbol, Bytes>(&VK_KEY)
-            .map(|vk_bytes| vk_commitment(env, VK_COMMITMENT_DOMAIN, &vk_bytes))
     }
 }

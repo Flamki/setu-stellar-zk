@@ -431,13 +431,14 @@ For Proof / PublicSignals wire bytes and circuit signal ordering, see
 - Testnet native asset is used as the testnet asset.
 - The trusted setup is local/staging-only and not production-secure.
 - There is no relayer, so gas metadata privacy is future work.
+- Withdrawal gas privacy is a design-only proposal; no relayer is implemented or tested.
 
 ## Future Work
 
 - Bind recipient and purpose into the deposit commitment.
 - Add authenticated auditor registry or verifier-key commitments.
 - Use per-receipt nonce/key derivation for auditor tags.
-- Add relayers for withdrawal gas privacy.
+- Implement the relayer flow described in [Relayer Flow for Withdrawal Gas Privacy](docs/relayer-flow.md).
 - Support multiple denominations or variable amounts.
 - Replace local trusted setup with a real ceremony.
 - Integrate real Stellar anchors for SEP-24/SEP-31 production corridors.
@@ -448,3 +449,5 @@ Base privacy-pool implementation: `ymcrcat/soroban-privacy-pools`, MIT.
 
 Setu additions are active-development code. This is not audited production
 software yet and is not legal, compliance, or financial advice.
+
+See [Relayer Flow for Withdrawal Gas Privacy](docs/relayer-flow.md) for the design doc, privacy gains and limits, and the follow-up implementation tasks. No relayer is implemented or tested in this prototype.
