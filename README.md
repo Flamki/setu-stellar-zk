@@ -1,3 +1,4 @@
+
 # Setu
 
 Private remittances on Stellar with compliance-oriented selective disclosure.
@@ -26,7 +27,6 @@ black-box mixer.
 
 ## Ownership
 
-Relayer design decisions for withdrawal gas privacy are documented in [`docs/relayer-flow.md`](docs/relayer-flow.md).
 Area ownership and review routing notes live in [`docs/OWNERSHIP.md`](docs/OWNERSHIP.md).
 A `.github/CODEOWNERS` file is intentionally omitted until real maintainer handles are published.
 
@@ -432,14 +432,14 @@ For Proof / PublicSignals wire bytes and circuit signal ordering, see
 - Testnet native asset is used as the testnet asset.
 - The trusted setup is local/staging-only and not production-secure.
 - There is no relayer, so gas metadata privacy is future work.
-- The relayer flow is a design document only; no relayer implementation is claimed until it is tested.
+- Withdrawal gas privacy is a design-only proposal; see [Relayer Flow Design](docs/relayer-flow.md). No relayer is implemented or tested.
 
 ## Future Work
 
 - Bind recipient and purpose into the deposit commitment.
 - Add authenticated auditor registry or verifier-key commitments.
 - Use per-receipt nonce/key derivation for auditor tags.
-- Implement the relayer flow for withdrawal gas privacy per [`docs/relayer-flow.md`](docs/relayer-flow.md).
+- Implement the relayer flow described in [Relayer Flow Design](docs/relayer-flow.md) (tracked as follow-up tasks).
 - Support multiple denominations or variable amounts.
 - Replace local trusted setup with a real ceremony.
 - Integrate real Stellar anchors for SEP-24/SEP-31 production corridors.
@@ -450,3 +450,5 @@ Base privacy-pool implementation: `ymcrcat/soroban-privacy-pools`, MIT.
 
 Setu additions are active-development code. This is not audited production
 software yet and is not legal, compliance, or financial advice.
+
+Relayer design notes in [Relayer Flow Design](docs/relayer-flow.md) are a proposal only and make no implementation claim.

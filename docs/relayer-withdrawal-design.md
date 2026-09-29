@@ -1,167 +1,117 @@
 # Relayer Withdrawal Gas Privacy Design
 
-Status: draft design document. No implementation is claimed here.
-This document describes options and decisions only. Any change to code,
-tests, or RPE must be landed in its own PR with tests before any privacy
-guarantee is asserted.
+**Status: design only.** This document describes a relayer flow for Setu withdrawals. It is not an implementation claim. No relayer code exists in this repository yet, and nothing here should be read as a working feature. The current contract still requires the recipient to sign and pay for the withdrawal transaction.
+
+---
 
 ## Problem
 
-In the current withdrawal flow the recipient signs the transaction and pays the
-network fee directly. This links the recipient address to the withdrawal on
-chain and leaks metadata that is not covered by the ZK proof:
+In the current `withdraw(` the recipient address is the transaction source and signer. The ZK proof hides which deposit leaf is being spent, but the Stellar ledger still records the account that submitted the transaction and paid the fee. That account is linked to the withdrawal in time and space, which is a metadata leak outside the proof. Any observer who already knows the recipient's address can confirm that the address withdrew from the pool, even though the proof itself does not reveal the deposit leaf.
 
-- The recipient address appears as the source account of the transaction.
-- The fee payer is the same address as the recipient.
-- Timing and fee amount are visible and correlatable with the deposit.
+## Goal
 
-The ZK proof attests that the withdrawal is authorized by a note in the
-tree, but it does not hide who submits the transaction or who pays for it.
-
-## Goals
-
-- Remove the direct link between the recipient address and the transaction
-submitter/fee payer.
-- Keep the ZK verification and nullifier checks intact.
-- Preserve replay protection via the nullifier.
-- Document the privacy gains and the remaining limits.
+Break the direct link between the withdrawing account and the withdrawal transaction by having a third-party relayer submit the transaction and pay the fee, while the proof still binds the payout to the recipient's chosen address.
 
 ## Non-Goals
 
-- Full anonymity set of any size.
-- Hiding the existence of a withdrawal from the contract state.
-- Hiding the withdrawal amount from the contract events.
-- Replacing the ZK verifier or changing the note format.
+- This document does not design a full anonymous payment network. It only addresses gas and transaction-origin metadata.
+- It does not claim to hide the fact that a withdrawal occurred, the amount, or the nullifier hash.
+- It does not change the current trusted-setup or audit status.
 
-## Relayer Options on Soroban
+## Soroban Reality Check
 
-Soroban transactions are submitted by an account that pays the fee and
-supplies the source account sequence number. The following options were
-considered for decoupling the recipient from the submitter.
+Soroban transactions have a source account that signs and pays the fee. There is no native meta-transaction or gas-sponsoring primitive in the contract layer today. Therefore a relayer must be an account that the recipient trusts to submit the transaction on their behalf. The relayer pays the fee and the recipient gets the withdrawal amount. The recipient address is still recorded in the transfer as the destination, so the relayer can link the withdrawal to the recipient if it chooses to. The privacy gain is that the withdrawing account is not the transaction source, not that the recipient is unknowable.
 
-### Option A: Recipient-submitted with fee bump
+## Relayer Options
 
-The recipient still signs and submits the withdrawal, but a fee-bump
-transaction is added so a second account covers the fee.
+### Option A - Single trusted relayer (centralized)
 
-- Privacy gain: the fee payer is not the recipient.
-- Privacy limit: the recipient address is still the source account of the
-withdrawal operation and appears in the transaction envelope.
-- Replay protection: unchanged, the nullifier is consumed on chain.
-- Effort: low, reuses existing withdrawal path.
+The recipient sends the proof and public signals to a relayer out of band. The relayer submits `withdraw(` with its own account as the transaction source, sets `to` to the recipient address, and pays the fee.
 
-### Option B: Relayer submits the withdrawal
+- Privacy gain: the withdrawing account is not the transaction source.
+- Limits: the relayer sees the proof and the recipient address, so it can link them. The relayer is a single point of failure and censorship.
+- Fee: the relayer pays the Stellar fee in XLM and must be reimbursed out of band.
 
-A third-party relayer account submits the withdrawal transaction and pays
-the fee. The withdrawal call carries the ZK proof, the nullifier, and the
-recipient address as a parameter.
+### Option B - Relayer pool (multiple independent relayers)
 
-- Privacy gain: the source account is the relayer, not the recipient.
-- Privacy limit: the recipient address is still visible in the call arguments
-unless the contract emits only a commitment and the recipient claims separately.
-- Privacy limit: the relayer learns the recipient address and the fee amount
-  and can correlate them.
-- Replay protection: the nullifier is consumed on chain by the contract.
-- Effort: medium, requires a relayer integration and a fee mechanism.
+Multiple relayers listen for withdrawal requests and compete to submit them. The recipient broadcasts the proof and public signals to a relayer network. Any relayer can submit.
 
-### Option C: Relayer with fee paid from the note
+- Privacy gain: the recipient does not have to trust a single relayer. The withdrawing account is not the transaction source.
+- Limits: the recipient address is still visible in the transfer, and the relayer that wins the race sees the proof and the recipient address. The relayer pool needs a fee reimbursement mechanism.
 
-The relayer submits the withdrawal and the contract pays the relayer a
-fee deducted from the withdrawal amount. The ZK circuit must attest the fee
-and the relayer address so the contract can verify the payment without trusting
-the relayer.
+### Option C - Proof-bound relayer fee (in-circuit fee)
 
-- Privacy gain: the recipient does not need a funded account to withdraw.
-- Privacy limit: the relayer address and the fee amount are visible on chain.
-- Privacy limit: the circuit must be extended to bind the fee and relayer,
-which changes the proving key and the verifier.
-- Replay protection: the nullifier is consumed on chain and the fee binding
-prevents a relayer from replaying the same proof with a different fee.
-- Effort: high, requires a circuit change and a new trusted setup.
+Extend the withdrawal circuit to include a relayer fee and a relayer address as public inputs. The contract transfers the fee to the relayer and the remainder to the recipient.
 
-### Option D: Relayer with a fee vault
+- Privacy gain: the fee is paid from the pool, so the relayer does not need to be reimbursed out of band. The relayer address is binded into the proof, so a relayer cannot steal the fee.
+- Limits: this is a circuit and contract change, not a deployment configuration. It requires a new trusted setup for the modified circuit. The recipient address is still visible in the transfer.
 
-The relayer submits the withdrawal and is reimbursed from a fee vault
-funded by the user outside the withdrawal flow. This keeps the ZK circuit
-unchanged but adds a funding step.
+### Option D - Native gas-sponsoring (future Soroban feature)
 
-- Privacy gain: the withdrawal call does not carry a fee binding.
-- Privacy limit: the vault funding is a separate on-chain transaction that
-can be correlated with the recipient.
-- Privacy limit: the relayer is paid from a pool that is visible on chain.
-- Replay protection: the nullifier is consumed on chain.
-- Effort: medium, requires a vault contract and funding flow.
+If Soroban ever exposes a native fee-sponsoring or meta-transaction primitive, the recipient could sign the withdrawal without paying the fee. This is not available today and is out of scope for the immediate relayer work.
 
 ## Decision
 
-The design selects Option B as the first step and Option C as the target.
-Option B is the minimal change that removes the recipient from the source
-account and from the fee payer. Option C removes the need for the recipient to
-hold a funded account and binds the fee in the proof, at the cost of a circuit
-change.
+For the first implementation, use **Option A** (a single trusted relayer) with a clear documented trust model. It is the smallest change that actually breaks the direct link between the withdrawing account and the transaction. Option B can follow once the fee reimbursement flow is proven. Option C is the long-term goal but requires a circuit change and a new trusted setup, so it is out of scope for the first PRs.
 
-### Recipient address
+## Recipient Address
 
-The recipient address is passed as a call argument to the withdrawal
-function. The ZK proof binds the note to the withdrawal authority but does not
-bind the recipient address in Option B. The contract must not trust the
-relayer to choose the recipient; the recipient is part of the call data signed
-by the relayer and is verified against the note authority in the circuit when
-Option C is enabled.
+The recipient address is not hidden by the ZK proof. The `withdraw()` call already takes `to: Address` and the contract transfers the fixed amount to that address. The relayer flow does not change this. The recipient address is still visible in the transfer event and in the transaction result. What changes is that the recipient address is no longer the transaction source or the fee payer.
 
-### Fee payment
+To keep the recipient address from being linked to the withdrawing account, the relayer must not be the same account as the recipient, and the relayer must not be a deterministic function of the recipient address. The design document recommends the relayer use a fresh account per withdrawal or a common account that is not derived from the recipient.
 
-In Option B the relayer pays the network fee and is reimbursed by an agreed
-amount that is settled outside the contract or by a separate transfer. In
-Option C the contract deducts the fee from the withdrawal amount and pays the
-relayer. The fee and the relayer address must be binded in the ZK proof so the
-contract can reject a proof that was produced for a different fee or relayer.
+## Fee Payment
 
-### Replay Protection
+The relayer pays the Stellar network fee in XLM. The fee is paid from the relayer's account, not from the pool. The recipient receives the full `FIXED_AMOUNT` because the contract transfers exactly `FIXED_AMOUNT` to `to`. The relayer must be reimbursed out of band for the first implementation.
 
-The nullifier is the primary replay protection. The contract must record the
-nullifier as spent before releasing funds. The relayer must not be able to replay
-the same proof with a different recipient or fee. In Option C the binding of the
-fee and relayer in the proof adds a second layer of protection against fee
-replay.
+The fee reimbursement model is documented here but not implemented:
 
-## Privacy Gains
+- The recipient and relayer agree on a fee amount out of band.
+- The relayer submits the withdrawal and pays the network fee.
+- The recipient pays the relayer the agreed fee out of band, either before or after the withdrawal settles.
 
-- The recipient address is no longer the source account of the transaction.
-- The fee payer is no longer the recipient in Option B and Option C.
-- The recipient does not need to hold a funded account to withdraw in Option C.
+This is a trust assumption. If the recipient does not pay, the relayer loses the fee. If the relayer does not submit, the recipient loses nothing but time. The design document does not claim to solve this trust problem.
 
-## Privacy Limits
+## Replay Protection
 
-- The withdrawal event is still visible on chain. The existence of a withdrawal
-and its timing are not hidden.
-- The withdrawal amount is visible in the contract events unless the amount is
-split or delayed by a separate mechanism.
-- The relayer learns the recipient address in Option B, so the relayer must be
-trusted not to correlate it with the deposit.
-- The relayer address and fee are visible on chain in Option C.
-- A single relayer that serves many withdrawals can be a correlation point.
-- The design does not hide the fact that the contract is being used.
+Replay protection is already enforced by the contract through the nullifier mechanism:
+
+- The withdrawal proof reveals `nullifierHash` as a public signal.
+- The contract checks whether `nullifierHash` has been used before (`Error.NullifierUsed`).
+- On success, the contract adds `nullifierHash` to the used-nullifier list.
+
+Because the nullifier is bound to the note and the contract records it on the first successful withdrawal, a relayer cannot replay the same proof to withdraw twice. The relayer flow does not need any additional replay protection. The existing nullifier check is the only replay guard, and it is already tested in the contract test suite.
+
+## Privacy Gains and Limits
+
+### Gains
+
+- The withdrawing account is not the transaction source, so the account that knows the note opening is not on-chain link-able to the withdrawal by default.
+- The fee is paid by the relayer, so the recipient account does not need to hold XLM or appear in the transaction fee history.
+- The nullifier hash is still the only public link to the spent note, and it is already part of the proof's public signals.
+
+### Limits
+
+- The recipient address is still visible in the transfer. The relayer flow hides the withdrawing account, not the recipient.
+- The relayer sees the proof and the recipient address, so the relayer can link them if it chooses to. This is a trust assumption, not a cryptographic guarantee.
+- The fact that a withdrawal occurred, the amount, and the nullifier hash are still public.
+- Timing correlation remains possible. If the recipient deposits and withdraws in a predictable pattern, an observer may still infer links.
+- There is no guarantee that the relayer will submit the transaction. The recipient depends on the relayer's good behavior.
+- The design does not hide the relayer's own account activity. If the relayer is unique to one withdrawal, the relayer account itself becomes a correlation point.
 
 ## Follow-Up Implementation Tasks
 
-1. Add a relayer entry point to the withdrawal contract that accepts the ZK
-proof, the nullifier, and the recipient address as arguments.
-2. Add tests that confirm the nullifier is consumed and that a replay with
-the same proof is rejected.
-3. Extend the ZK circuit to bind the recipient address, and later the fee
-and relayer address, and regenerate the verifier and the trusted setup.
-4. Add a fee accounting path that deducts the fee from the withdrawal amount
-and pays the relayer.
-5. Add an integration test that runs the relayer flow end to end on a test
-network.
-6. Update the README to describe the relayer flow and its limits once the
-tests pass.
+1. Add a relayer client that accepts a withdrawal proof and public signals, submits `withdraw()` from a relayer account, and pays the fee.
+2. Add a relayer request format and an out-of-band fee agreement checklist.
+3. Add a test that shows the withdrawing account is not the transaction source when the relayer submits.
+4. Add a test that shows a replay of the same proof fails with `NullifierUsed`.
+5. Extend the circuit and contract to bind a relayer fee and relayer address into the proof (Option C).
+6. Replace the local trusted setup with a public ceremony before any relayer fee feature is claimed to be secure.
 
-## Honesty Limits
+## Honesty Notes
 
-No implementation is claimed in this document. The design is a prototype
-plan. The current code base still uses the recipient-submitted flow. The
-privacy properties described here are not guaranteed until the follow-up tasks
-are landed with tests. The README and code comments must stay honest about this
-status.
+- This document is a design proposal. No relayer code has been written or tested.
+- The current contract still requires the recipient to sign and pay for the withdrawal. The relayer flow is future work.
+- The privacy gain from a relayer is limited to transaction-origin metadata. It does not make the withdrawal anonymous.
+- The relayer trust model is not solved by this design. Any relayer implementation must be evaluated for censorship resistance and fee reimbursement risk.
+- This document does not claim that the relayer flow is implemented, tested, audited, or production-ready.
