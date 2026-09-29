@@ -359,6 +359,28 @@ cd site
 npm run smoke
 ```
 
+## Site Deployment
+
+`site/` is a dependency-free static bundle deployed to Vercel; there is no site
+backend. The reproducible deploy command, the Supabase environment variables the
+build consumes, the explicit static/mock/live inventory of what a deployment
+actually serves, and the rollback procedure are documented in
+[Site Deployment](docs/SITE-DEPLOYMENT.md).
+
+```powershell
+cd site
+npm install
+$env:SETU_SUPABASE_URL="https://<project-ref>.supabase.co"
+$env:SETU_SUPABASE_ANON_KEY="<anon-or-publishable-key>"
+npm run build
+npm run smoke
+npx vercel --prod
+```
+
+Without `SETU_SUPABASE_URL` and `SETU_SUPABASE_ANON_KEY` the deployed bundle is a
+static page and Supabase auth stays disabled — the site shows a configuration
+warning rather than implying a live backend.
+
 ## Project Structure
 
 ```text
@@ -373,6 +395,7 @@ docs/public-signal-serialization.md
                            Proof/PublicSignals wire format + signal order
 scripts/live_testnet_e2e.ps1
 site/                      Supabase-authenticated web app
+docs/SITE-DEPLOYMENT.md    Vercel deploy path, env vars, rollback
 supabase/migrations/       Profiles table, trigger, and RLS policies
 ```
 
