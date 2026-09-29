@@ -1,3 +1,4 @@
+
 # Setu
 
 Private remittances on Stellar with compliance-oriented selective disclosure.
@@ -192,6 +193,8 @@ Regression tests cover:
 The full byte layout (Proof, PublicSignals length prefix, endianness, field
 modulus, rejection cases, and withdrawal/disclosure signal order) is specified in
 [Public Signal Serialization](docs/public-signal-serialization.md).
+
+The withdrawal relayer design (privacy gains, limits, fee/replay model, and follow-up tasks) is specified in [Withdrawal Relayer Design](docs/withdrawal-relayer.md).
 
 ## circom2soroban Conversion Audit
 
@@ -408,6 +411,7 @@ circuits/disclosure.circom selective-disclosure receipt circuit
 docs/vk-commitments.md   VK commitment scheme + how to recompute it
 docs/public-signal-serialization.md
                            Proof/PublicSignals wire format + signal order
+docs/withdrawal-relayer.md Relayer flow design for withdrawal gas privacy
 scripts/live_testnet_e2e.ps1
 site/                      Supabase-authenticated web app
 docs/SITE-DEPLOYMENT.md    Vercel deploy path, env vars, rollback
@@ -431,14 +435,14 @@ For Proof / PublicSignals wire bytes and circuit signal ordering, see
 - Testnet native asset is used as the testnet asset.
 - The trusted setup is local/staging-only and not production-secure.
 - There is no relayer, so gas metadata privacy is future work.
-- Withdrawal gas privacy is a design-only proposal; no relayer is implemented or tested.
+- The relayer flow is a design only; no relayer code is implemented or tested yet.
 
 ## Future Work
 
 - Bind recipient and purpose into the deposit commitment.
 - Add authenticated auditor registry or verifier-key commitments.
 - Use per-receipt nonce/key derivation for auditor tags.
-- Implement the relayer flow described in [Relayer Flow for Withdrawal Gas Privacy](docs/relayer-flow.md).
+- Implement the relayer flow described in [Withdrawal Relayer Design](docs/withdrawal-relayer.md).
 - Support multiple denominations or variable amounts.
 - Replace local trusted setup with a real ceremony.
 - Integrate real Stellar anchors for SEP-24/SEP-31 production corridors.
@@ -449,5 +453,4 @@ Base privacy-pool implementation: `ymcrcat/soroban-privacy-pools`, MIT.
 
 Setu additions are active-development code. This is not audited production
 software yet and is not legal, compliance, or financial advice.
-
-See [Relayer Flow for Withdrawal Gas Privacy](docs/relayer-flow.md) for the design doc, privacy gains and limits, and the follow-up implementation tasks. No relayer is implemented or tested in this prototype.
+The relayer design document describes intended behavior only and makes no tested implementation claim.

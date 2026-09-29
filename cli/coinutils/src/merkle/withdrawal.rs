@@ -1,61 +1,66 @@
-//! Withdrawal SNARK input construction.
+//! # Withdrawal flow (prototype)
 //!
-//! # Relayer flow design notes (privacy)
+//! ## Current behavior
+//! The withdrawal recipient is expected to submit the withdrawal transaction
+//! themselves. The recipient address is therefore visible on-chain as the
+//! transaction source, and the recipient pays the Soroban resource fees
+//! directly. This leaks metadata that is *not* covered by the ZK proof:
+//! the link between the recipient account and the withdrawal event, the
+//! timing of the withdrawal, and the fee payer identity.
 //!
-//! This module only builds the SNARK input for a withdrawal. It does **not**
-//! implement a relayer, and no relayer behavior here has been tested on
-//! Soroban. The notes below are a design sketch for follow-up work.
+//! ## Relayer options considered for Soroban
+//! 1. **Third-party relayer submits the tx.** A relayer account (or a pool of
+//!    relayer accounts) signs and pays fees for the withdrawal transaction.
+//!    The recipient address is passed as a contract argument instead of being
+//!    the tx source. Privacy gain: recipient is decoupled from the tx source.
+//!    Limit: the relayer learns the recipient address and the withdrawal
+//!    timing, so privacy is only as good as the relayer's honesty and the
+//!    anonymity set of relayer-submitted withdrawals.
+//! 2. **Fee abstraction / sponsored fees.** Soroban supports fee-bump
+//!    transactions, where a sponsor account pays the fee while the recipient
+//!    (or relayer) provides the inner transaction. Privacy gain: fee payer is
+//!    decoupled from the withdrawal. Limit: the inner tx source is still the
+//!    recipient unless combined with option 1, so this alone does not hide
+//!    the recipient.
+//! 3. **Relayer with fee paid from the withdrawn value.** The proof commits
+//!    to a fee amount, and the contract transfers `value - fee` to the
+//!    recipient and `fee` to the relayer. Privacy gain: relayer is
+//!    incentivized without an out-of-band payment. Limit: the fee amount and
+//!    relayer address are public, and the circuit must be extended to bind
+//!    the fee, which is not implemented here.
 //!
-//! ## Why a relayer
-//! Today the withdrawal recipient signs and submits the transaction directly,
-//! which links the recipient's Stellar account to the withdrawal on-chain.
-//! The ZK proof hides the deposit-to-withdrawal link, but the transaction
-//! envelope (source account, fee payer, memo, timing) still leaks metadata.
-//! A relayer submits the withdrawal on the recipient's behalf so the
-//! recipient's account never appears as the transaction source.
-//!
-//! ## Options considered for Soroban
-//! 1. **Permissionless relayer contract**: a Soroban contract that accepts a
-//!    signed withdrawal intent plus the SNARK proof, verifies it, and pays
-//!    out to a recipient address specified inside the intent. The relayer's
-//!    own account is the transaction source.
-//! 2. **Off-chain relayer + plain Soroban call**: an off-chain service
-//!    submits the withdrawal transaction and is reimbursed from the pool.
-//!    Simpler, but the relayer is a liveness/trust dependency.
-//! 3. **Fee abstraction via a relayer fee**: the withdrawal amount is split
-//!    into `recipient_amount` and `relayer_fee` inside the proof, so the
-//!    relayer is paid without an out-of-band transfer.
-//!
-//! ## Recipient address, fee payment, replay protection
-//! - **Recipient address**: bound into the SNARK public inputs as a hash so
-//!   the relayer cannot redirect funds. The relayer only learns the address
-//!   at submission time; it is not linked to the deposit.
-//! - **Fee payment**: a `relayer_fee` public input, paid from the withdrawn
-//!   value to the relayer's account. The fee must be committed to in-circuit
-//!   so the relayer cannot inflate it.
-//! - **Replay protection**: the nullifier (already produced here) is the
-//!   primary replay guard and must be recorded on-chain at withdrawal time.
-//!   A per-intent nonce/deadline is also recommended so a relayer cannot
-//!   hold and resubmit a stale intent.
+//! ## Decisions (design only, not yet implemented)
+//! - **Recipient address**: passed as a public contract argument, not derived
+//!   from the proof. The proof binds the nullifier and commitment; the
+//!   recipient is intentionally *not* bound by the current circuit.
+//! - **Fee payment**: a relayer account pays the Soroban resource fee. The
+//!   relayer is compensated out-of-band in this prototype. On-chain fee
+//!   deduction from the withdrawn value is a follow-up task and requires a
+//!   circuit change.
+//! - **Replay protection**: the nullifier is the replay guard. The contract
+//!   must reject a nullifier that has already been spent. This file only
+//!   produces the SNARK input; nullifier storage and checking live in the
+//!   contract and are a follow-up task.
 //!
 //! ## Privacy gains and limits
-//! - **Gains**: the recipient's Stellar account is not the transaction
-//!   source; fee payment does not require the recipient to hold XLM; the
-//!   deposit-to-withdrawal link stays hidden by the existing proof.
-//! - **Limits**: the relayer sees the recipient address and the withdrawal
-//!   amount, so it can correlate withdrawals it processes. Timing, amount,
-//!   and relayer-set correlation are not hidden. A single dominant relayer
-//!   becomes a metadata chokepoint. These limits must be documented in the
-//!   README and must not be described as solved until tested.
+//! - Gain: with a relayer, the recipient is not the tx source, so the
+//!   recipient account is not directly linked to the withdrawal tx.
+//! - Limit: the relayer sees the recipient address and timing. A single
+//!   relayer is a central point of metadata leakage.
+//! - Limit: the current circuit does not bind the recipient or the fee, so
+//!   the relayer could redirect funds if the contract does not enforce the
+//!   recipient argument correctly.
+//! - Limit: this is a prototype. No relayer flow is implemented in this
+//!   module yet; only the SNARK input for a recipient-signed withdrawal is
+//!   produced.
 //!
 //! ## Follow-up implementation tasks
-//! - [ ] Add `recipient_hash` and `relayer_fee` to `SnarkInput` and the
-//!       circuit; update this module to populate them.
-//! - [ ] Add on-chain nullifier recording and intent nonce/deadline checks.
-//! - [ ] Implement and test a permissionless relayer contract on Soroban.
-//! - [ ] Add integration tests covering replay, fee tampering, and
-//!       recipient redirection attempts.
-//! - [ ] Update README to state clearly that no relayer is implemented yet.
+//! - [ ] Add a `relayer` argument to the withdrawal contract entrypoint and
+//!       route the fee to it.
+//! - [ ] Extend the circuit to bind `recipient` and `fee` as public inputs.
+//! - [ ] Add nullifier storage and replay rejection in the contract.
+//! - [ ] Add tests covering relayer-submitted withdrawals and replay.
+//! - [ ] Document relayer trust assumptions in the README.
 
 use crate::{
     config::TREE_DEPTH,
@@ -76,10 +81,11 @@ impl WithdrawalManager {
 
     /// Withdraw a coin and generate SNARK input
     ///
-    /// NOTE: This builds the SNARK input only. It does not submit a
-    /// transaction and does not implement any relayer flow. The relayer
-    /// design notes at the top of this file are a sketch, not a tested
-    /// implementation.
+    /// NOTE: This prototype assumes the recipient signs and pays for the
+    /// withdrawal transaction directly. The recipient address is not part of
+    /// the SNARK input and is not bound by the proof. See the module-level
+    /// docs for the relayer design and its privacy limits. No relayer flow
+    /// is implemented here yet.
     pub fn withdraw_coin(
         &self,
         env: &Env,
