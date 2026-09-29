@@ -1,66 +1,54 @@
-//! # Withdrawal flow (prototype)
+//! Withdrawal SNARK input construction for the CoinUtils CLI.
 //!
-//! ## Current behavior
-//! The withdrawal recipient is expected to submit the withdrawal transaction
-//! themselves. The recipient address is therefore visible on-chain as the
-//! transaction source, and the recipient pays the Soroban resource fees
-//! directly. This leaks metadata that is *not* covered by the ZK proof:
-//! the link between the recipient account and the withdrawal event, the
-//! timing of the withdrawal, and the fee payer identity.
+//! # Prototype limits (read before relying on this module)
 //!
-//! ## Relayer options considered for Soroban
-//! 1. **Third-party relayer submits the tx.** A relayer account (or a pool of
-//!    relayer accounts) signs and pays fees for the withdrawal transaction.
-//!    The recipient address is passed as a contract argument instead of being
-//!    the tx source. Privacy gain: recipient is decoupled from the tx source.
-//!    Limit: the relayer learns the recipient address and the withdrawal
-//!    timing, so privacy is only as good as the relayer's honesty and the
-//!    anonymity set of relayer-submitted withdrawals.
-//! 2. **Fee abstraction / sponsored fees.** Soroban supports fee-bump
-//!    transactions, where a sponsor account pays the fee while the recipient
-//!    (or relayer) provides the inner transaction. Privacy gain: fee payer is
-//!    decoupled from the withdrawal. Limit: the inner tx source is still the
-//!    recipient unless combined with option 1, so this alone does not hide
-//!    the recipient.
-//! 3. **Relayer with fee paid from the withdrawn value.** The proof commits
-//!    to a fee amount, and the contract transfers `value - fee` to the
-//!    recipient and `fee` to the relayer. Privacy gain: relayer is
-//!    incentivized without an out-of-band payment. Limit: the fee amount and
-//!    relayer address are public, and the circuit must be extended to bind
-//!    the fee, which is not implemented here.
+//! This module only builds the witness/`SnarkInput` for a withdrawal proof.
+//! It does **not** implement a relayer, does **not** submit transactions, and
+//! does **not** provide any on-chain privacy guarantees by itself.
 //!
-//! ## Decisions (design only, not yet implemented)
-//! - **Recipient address**: passed as a public contract argument, not derived
-//!   from the proof. The proof binds the nullifier and commitment; the
-//!   recipient is intentionally *not* bound by the current circuit.
-//! - **Fee payment**: a relayer account pays the Soroban resource fee. The
-//!   relayer is compensated out-of-band in this prototype. On-chain fee
-//!   deduction from the withdrawn value is a follow-up task and requires a
-//!   circuit change.
-//! - **Replay protection**: the nullifier is the replay guard. The contract
-//!   must reject a nullifier that has already been spent. This file only
-//!   produces the SNARK input; nullifier storage and checking live in the
-//!   contract and are a follow-up task.
+//! ## Privacy context
 //!
-//! ## Privacy gains and limits
-//! - Gain: with a relayer, the recipient is not the tx source, so the
-//!   recipient account is not directly linked to the withdrawal tx.
-//! - Limit: the relayer sees the recipient address and timing. A single
-//!   relayer is a central point of metadata leakage.
-//! - Limit: the current circuit does not bind the recipient or the fee, so
-//!   the relayer could redirect funds if the contract does not enforce the
-//!   recipient argument correctly.
-//! - Limit: this is a prototype. No relayer flow is implemented in this
-//!   module yet; only the SNARK input for a recipient-signed withdrawal is
-//!   produced.
+//! In the current prototype the withdrawal recipient signs and pays the
+//! transaction fee directly. That leaks metadata (recipient account, fee
+//! payer, timing, and any Soroban auth entries) *outside* the ZK proof, even
+//! though the note itself stays hidden. A relayer flow is the intended
+//! mitigation, but it is **not implemented here**.
+//!
+//! ## Relayer options considered for Soroban (design only, untested)
+//!
+//! 1. **Explicit relayer account**: recipient hands the proof to a relayer
+//!    service; the relayer submits the withdrawal tx and pays the fee. The
+//!    recipient address never appears in the tx. Requires the contract to
+//!    accept the proof from any caller and to bind the payout to a value
+//!    committed inside the proof (or a fresh one-time address).
+//! 2. **Fee-in-note**: the note value is split into payout + relayer fee, so
+//!    the relayer is compensated from the shielded pool. Requires the circuit
+//!    to expose a fee field and the contract to enforce it.
+//! 3. **Meta-transaction / sponsored auth**: keep the recipient as the
+//!    logical signer but have the relayer cover fees via Soroban auth
+//!    delegation. Still leaks the recipient as the auth signer unless the
+//!    contract uses a one-time key.
+//!
+//! ## Open decisions (tracked as follow-ups, not resolved here)
+//!
+//! - How the recipient address is bound: committed in the note vs. supplied
+//!   as a fresh one-time address at withdrawal time.
+//! - How the relayer fee is paid: out-of-band vs. fee-in-note.
+//! - Replay protection: nullifier is already in the proof; the contract must
+//!   still enforce single-use on-chain. Relayer identity must not be the only
+//!   replay guard.
 //!
 //! ## Follow-up implementation tasks
-//! - [ ] Add a `relayer` argument to the withdrawal contract entrypoint and
-//!       route the fee to it.
-//! - [ ] Extend the circuit to bind `recipient` and `fee` as public inputs.
-//! - [ ] Add nullifier storage and replay rejection in the contract.
-//! - [ ] Add tests covering relayer-submitted withdrawals and replay.
-//! - [ ] Document relayer trust assumptions in the README.
+//!
+//! - [ ] Add a `relayer` / `fee` field to the withdrawal circuit and contract.
+//! - [ ] Implement a relayer client that submits the withdrawal tx.
+//! - [ ] Add contract-side nullifier replay protection tests.
+//! - [ ] Add integration tests proving the recipient address is absent from
+//!       the submitted transaction when a relayer is used.
+//! - [ ] Update README to describe the relayer flow and its limits.
+//!
+//! No privacy claim in this file should be treated as verified until the
+//! follow-up tests above exist and pass.
 
 use crate::{
     config::TREE_DEPTH,
@@ -71,7 +59,11 @@ use crate::{
 use lean_imt::LeanIMT;
 use soroban_sdk::{crypto::bls12_381::Fr as BlsScalar, Env};
 
-/// Manager for handling coin withdrawal operations
+/// Manager for handling coin withdrawal operations.
+///
+/// Note: this type only produces SNARK input. It does not submit transactions
+/// and does not implement relaying. See the module-level docs for the relayer
+/// design notes and prototype limits.
 pub struct WithdrawalManager;
 
 impl WithdrawalManager {
@@ -79,13 +71,13 @@ impl WithdrawalManager {
         Self
     }
 
-    /// Withdraw a coin and generate SNARK input
+    /// Withdraw a coin and generate SNARK input.
     ///
-    /// NOTE: This prototype assumes the recipient signs and pays for the
-    /// withdrawal transaction directly. The recipient address is not part of
-    /// the SNARK input and is not bound by the proof. See the module-level
-    /// docs for the relayer design and its privacy limits. No relayer flow
-    /// is implemented here yet.
+    /// This builds the witness for the withdrawal proof from local state. It
+    /// does not broadcast anything and does not hide the caller's identity:
+    /// whoever submits the resulting proof on-chain is the fee payer and is
+    /// visible outside the proof. A relayer flow is required to change that,
+    /// and is not implemented here.
     pub fn withdraw_coin(
         &self,
         env: &Env,
