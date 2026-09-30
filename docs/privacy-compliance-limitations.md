@@ -27,7 +27,7 @@ A valid withdrawal proof, combined with the contract's own checks, proves that:
 - `nullifierHash` is correctly derived from the note's `nullifier`
   (`nullifierHash = Poseidon(nullifier)`).
 - The withdrawn value does not exceed the committed value (range-checked).
-- The note's `label` is a member of the current association set
+- The note's label` is a member of the current association set
   (`associationRoot`).
 
 The contract additionally enforces, independent of the proof:
@@ -56,7 +56,7 @@ A valid receipt proof (public signals
 
 `verify_disclosure` additionally checks, against the contract's own state:
 
-- `nullifierHash` is an **already-spent** withdrawal in **this** pool.
+- `nullifierHash` is an **already-spent** withdrawal in ***this*** pool.
 - `commitment` is a **real deposited leaf** in **this** pool.
 - The receipt proof verifies under the disclosure verification key.
 
@@ -76,7 +76,7 @@ withdrawal event with safe public metadata:
 - `amount`: the fixed withdrawal denomination (`FIXED_AMOUNT`), already public
   in the transfer.
 
-This event is emitted **only** after the proof verifies, the nullifier is
+This event is emitted ** only ** after the proof verifies, the nullifier is
 unused, and the transfer succeeds. A duplicate/nullifier failure, failed proof,
 or failed transfer does **not** emit the success event.
 
@@ -101,7 +101,7 @@ matters most for compliance claims.
   holder of the matching `viewingKey` recognize a receipt intended for them.
   It does not prove the auditor is a licensed or registered entity, and it is
   not a verifiable credential.
-- **Nothing links the receipt to a real-world person.** No proof connects the
+- `**Nothing links the receipt to a real-world person.**` No proof connects the
   deposit or withdrawal to a KYC'd identity, a bank account, or a regulated
   off-ramp. The proofs are purely cryptographic statements about on-chain
   state.
@@ -129,6 +129,103 @@ matters most for compliance claims.
 
 ---
 
+## Relayer Flow Design (Draft)
+
+**Status: design only. No relayer is implemented in this repository, and no
+implementation claim is made until it is tested on testnet.** The section
+below documents the options considered for Soroban, the decisions taken for
+follow-up work, and the privacy gains and limits that must be honestly
+represented once code exists.
+
+### Problem
+
+Today the withdrawing account signs and submits the transaction that calls
+the pool's `withdraw` entrypoint. The ZK proof hides the note opening and the
+spent leaf, but the Stellar transaction envelope still reveals the source
+account, the fee payer, the timing, and the destination account that receives
+`FIXED_AMOUNT`. That metadata is outside the proof and can be correlated with
+off-chain information. The goal of a relayer flow is to remove the
+withdrawing account from the transaction envelope and to decouple fee
+payment from the withdrawal authorization.
+
+### Options Considered for Soroban
+
+1. **Signer-funded relayer (relayer pays fee and submits)**. The withdrawer
+   sends the withdrawal proof and public signals to a relayer out of band.
+   The relayer wraps them in a Soroban transaction, pays the fee from its own
+   account, and submits the call. This is the simplest option and matches
+Stellar's existing fee-bump model.
+2. **Fee-bump transaction with the withdrawer as the inner source**. The
+   withdrawer signs an inner transaction and a relayer sponsors the fee via
+   a fee-bump operation. This keeps the withdrawer as the authorizing account
+   but still links the withdrawer's account to the transaction, so it does not
+   achieve the goal.
+3. **Contract-level fee abstraction**. The pool contract accepts a fee address
+   or fee token as part of the withdrawal call and forwards the fee to the
+   relayer. This adds contract sturface and new failure modes and is deferred
+   until the relayer flow is proven out.
+4. **No relayer (current state)**. The withdrawer signs and pays directly.
+   Simplest, but leaks the metadata described above.
+
+### Decisions
+
+- **Recipient address.** The recipient address is passed as a public input
+  to the withdrawal call and is paid `FIXED_AMOUNT`. It is **not** hidden
+  from the ledger; the relayer hides the *sender*, not the *recipient*.
+  The recipient address must therefore be treated as public metadata in
+  any privacy claim. Binding the recipient into the deposit commitment is
+  out of scope for this flow and remains future work.
+- **Fee payment.** The relayer pays the Soroban fee from its own account and
+  is reimbursed out of band, or through a future contract-level fee address
+  field. The fee is **not** paid by the withdrawing account in the relayed
+  flow, because that would re-link the withdrawer to the transaction.
+- `**Replay protection.** Replay protection remains the existing
+  `nullifierHash` double-spend check in the pool contract. The relayer does not
+  introduce a new authorization primitive and must not be trusted to enforce
+  uniqueness. A malicious relayer can regain nothing by resubmitting a spent
+  proof, because the contract rejects already-spent nullifiers. The relayer
+  must also not be able to mutate the recipient or amount; those are bound
+  into the proof and the contract checks.
+
+### Privacy Gains
+
+- The withdrawing account no longer appears as the transaction source or as
+  the fee payer in the ledger envelope.
+- Fee payment is decoupled from the withdrawal authorization, so a fee
+  payer's account is not linked to the withdrawal in the envelope.
+- Timing of the withdrawer's own activity is no longer directly correlated
+  with the withdrawal transaction.
+
+### Privacy Limits
+
+- The recipient address and the amount remain public on the ledger. A linked
+  off-chain observer can still correlate the payout with the recipient.
+- The relayer itself is a metadata chokepoint: if a relayer is the only one
+  submitting withdrawals, the relayer's address becomes a correlation key.
+  A meaningful privacy claim requires either multiple independent relayers
+  or a mixing strategy that is out of scope here.
+- The withdrawer must still communicate the proof to the relayer out of band.
+  That channel is outside the ZK proof and its metadata must be considered
+  separately (e.g. Network addresses, transport logs).
+- The contract cannot distinguish a relayed withdrawal from a direct one
+  until a fee address field exists. Without that field, relayer reimbursement
+  is out-of-band and not verifiable on-chain.
+- Relayer liveness and censorship resistance are open problems. A single
+  relayer can refuse to submit or delay submission.
+
+### Follow-Up Implementation Tasks
+
+1. Add a relayer entrypoint that accepts the withdrawal proof and public
+   signals and submits the contract call from a relayer account.
+2. Add a fee address or fee reimbursement field to the withdrawal call and
+   test that it cannot be used to redirect the payout.
+3. Add tests that a relayed withdrawal cannot be replayed and that a direct
+   withdrawal still behaves as before.
+4. Document the out-of-band channel and its metadata leaks in this file
+   before any privacy claim is made.
+
+---
+
 ## Anchor and Off-Ramp Status (Mock)
 
 The **on-ramp (USDC → pool) and off-ramp (pool → INR) corridors are
@@ -138,7 +235,7 @@ product-story stubs, not live anchor integrations.**
   (SEP-24/SEP-31) or fiat rails. The landing page and dashboard present a
   "Bob INR wallet" corridor as illustrative UI, not as a working corridor.
 - The testnet asset is the Stellar **native asset (XLM)** used as a stand-in
-  for USDC; there is no USDC or stablecoin integration on testnet or mainnet.
+  for USDC; there is no USDC, or stablecoin integration on testnet or mainnet.
 - There is no deposit-taker, no beneficiary bank account, and no settlement
   guarantee. "1,000 XLM" and "INR" figures in the UI are demo data.
 - `Supabase Auth` is wired for real accounts, but public sign-in only works
@@ -152,7 +249,7 @@ exists today.
 
 ## Trusted Setup
 
-The Groth16 trusted setup is **local/staging-only and not production-secure**:
+The Groth16 trusted setup is **not production-secure**:
 
 - The powers-of-tau and circuit-specific ceremony artifacts are generated
   locally by the setup scripts, not by a public ceremony with independent
@@ -196,7 +293,8 @@ considered for anything beyond a prototype:
 2. Replace the local trusted setup with a real, publicly-audited ceremony.
 3. Remove the zero-root association bypass from the withdrawal circuit.
 4. Integrate real Stellar anchors (SEP-24/SEP-31) and a real off-ramp.
-5. Add relayers so transaction metadata does not leak the sender.
+5. Implement and test the relayer flow described above so transaction
+   metadata does not leak the sender.
 6. Obtain a professional security and cryptography audit.
 7. Engage qualified counsel for licensing and KYC/AML/CFT design in each
    operating jurisdiction.
