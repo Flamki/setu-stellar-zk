@@ -1,0 +1,17 @@
+{
+  "circuit": "circuits/main.circom",
+  "spec": "docs/public-signal-serialization.md",
+  "order": [
+    "nullifierHash",
+    "withdrawnValue",
+    "stateRoot",
+    "associationRoot"
+  ],
+  "public_signals": [
+    "33832171054643436472546998686772011210227251098487950275135154568712175384598",
+    "1000000000",
+    "30162851960749159054107963444341137279716337900493764726816877893946218126682",
+    "30671046209969431012473152916297518771579159592633900587133061089753651787613"
+  ],
+  "provenance": "snarkjs public.json order for circuits/main.circom: circuit outputs first, then main {public [...]} inputs in declaration order. Values are the fresh testnet withdrawal signals recorded in README.md. Prototype fixture: they come from the local/staging single-contributor trusted setup, not a production ceremony."
+}

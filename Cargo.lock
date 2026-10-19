@@ -2494,5 +2494,6 @@ dependencies = [
  "ark-ec",
  "ark-ff",
  "ark-serialize",
+ "serde_json",
  "soroban-sdk",
 ]

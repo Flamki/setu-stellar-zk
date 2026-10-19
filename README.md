@@ -103,6 +103,13 @@ Setu adds:
 
 ### Withdrawal Circuit
 
+Public signals in snarkjs order (circuit outputs first, then
+`component main {public [...]}` inputs):
+
+```text
+[nullifierHash, withdrawnValue, stateRoot, associationRoot]
+```
+
 `circuits/main.circom` proves:
 
 - The prover knows a deposited note opening.
@@ -401,6 +408,8 @@ warning rather than implying a live backend.
 ```text
 contract/                  Soroban pool + disclosure verifier
 libs/zk/                   BLS12-381 Groth16 verifier and serializers
+libs/zk/testdata/public_signals/
+                           Fixture signal orders pinned by `cargo test -p zk`
 libs/lean-imt/             Lean incremental Merkle tree
 cli/circom2soroban/        snarkjs artifact conversion
 cli/coinutils/             note generation and witness input generation
