@@ -16,6 +16,7 @@ template DisclosureCompute() {
     signal input recipientId;
     signal input purpose;
     signal input viewingKey;
+    signal input receiptNonce;
 
     signal output nullifierHash;
     signal output commitment;
@@ -42,9 +43,10 @@ template DisclosureCompute() {
     dh.in[2] <== value;
     discloseHash <== dh.out;
 
-    component at = Poseidon255(2);
+    component at = Poseidon255(3);
     at.in[0] <== viewingKey;
     at.in[1] <== nh.out;
+    at.in[2] <== receiptNonce;
     auditorTag <== at.out;
 }
 

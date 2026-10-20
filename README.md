@@ -59,18 +59,25 @@ Fresh withdrawal public signals:
 ]
 ```
 
-Fresh disclosure public signals:
+Fresh disclosure public signals (v2, with per-receipt nonce; recomputed from
+the sample inputs in `circuits/disclosure_private.json` via the compute-only
+twin — the previously recorded v1 testnet values are superseded because the
+tag derivation now includes `receiptNonce`):
 
 ```json
 [
-  "33832171054643436472546998686772011210227251098487950275135154568712175384598",
-  "792451850146572312119437015092516461585820411321474856545290648487812800938",
-  "13601723215849916214344531109121559986847487952922840288412049033564696840611",
-  "49445820628079692271178516198415444927595013704302380125940463497865958044604"
+  "50965195888132986870075188991270610090721666015373119467878104864524153103363",
+  "13504266674507873070437848741371028790142490341642731696694125123435309057848",
+  "34148362321686645833561023478297102534116878299856681891161633532616282480240",
+  "48504087352648101872232104541849549896624195243212218591472176225635135984236",
+  "31337"
 ]
 ```
 
-On the fresh patched deployment:
+On the fresh patched deployment (recorded before the v2 receipt-nonce change;
+those on-chain artifacts verify the **v1** four-signal circuit and are kept as
+historical evidence only — re-running `scripts/build-circuits.sh` and the
+testnet flow regenerates v2 artifacts):
 
 - `snarkjs groth16 verify` for the disclosure proof returned `OK!`.
 - `verify_disclosure(validProof, validPublicSignals)` returned `true`.
@@ -146,7 +153,7 @@ reveals.
 `circuits/disclosure.circom` uses public signals:
 
 ```text
-[nullifierHash, commitment, discloseHash, auditorTag]
+[nullifierHash, commitment, discloseHash, auditorTag, receiptNonce]
 ```
 
 and private witness:
@@ -160,7 +167,18 @@ It proves:
 - `nullifierHash = Poseidon255(nullifier)`.
 - `commitment = Poseidon255(value, label, Poseidon255(nullifier, secret))`.
 - `discloseHash = Poseidon255(recipientId, purpose, value)`.
-- `auditorTag = Poseidon255(viewingKey, nullifierHash)`.
+- `auditorTag = Poseidon255(viewingKey, nullifierHash, receiptNonce)`.
+
+`receiptNonce` is a prover-chosen, public per-receipt nonce (not a secret): it
+is the domain separator that lets two receipts for the **same** withdrawal
+(same `nullifierHash`, same `viewingKey`) carry different `auditorTag` values,
+so repeated disclosures cannot be matched by comparing tags alone. v1 receipts
+used the deterministic tag `Poseidon255(viewingKey, nullifierHash)` and carried
+four public signals; they verify only under the archived v1 verification key,
+never under a v2 key. Prototype limit: the circuit cannot force a fresh nonce —
+a prover who reuses one recreates the v1 linkability for those receipts. Pinned
+derivation examples live in `libs/zk/testdata/receipt_tags.json` and are
+checked by `cargo test -p zk`.
 
 `verify_disclosure` additionally checks:
 
@@ -410,6 +428,8 @@ contract/                  Soroban pool + disclosure verifier
 libs/zk/                   BLS12-381 Groth16 verifier and serializers
 libs/zk/testdata/public_signals/
                            Fixture signal orders pinned by `cargo test -p zk`
+libs/zk/testdata/receipt_tags.json
+                           Pinned v2 auditor-tag derivation (nonce/key behavior)
 libs/lean-imt/             Lean incremental Merkle tree
 cli/circom2soroban/        snarkjs artifact conversion
 cli/coinutils/             note generation and witness input generation
@@ -447,7 +467,9 @@ For Proof / PublicSignals wire bytes and circuit signal ordering, see
 
 - Bind recipient and purpose into the deposit commitment.
 - Add authenticated auditor registry or verifier-key commitments.
-- Use per-receipt nonce/key derivation for auditor tags.
+- Enforce per-receipt nonce freshness in the receipt circuit (the v2 format
+  already separates receipts by `receiptNonce`; see the disclosure circuit
+  notes for the honest limit — prover-side discipline, not a proof guarantee).
 - Implement the relayer flow described in [Relayer Flow Design](docs/relayer-flow.md) (tracked as follow-up tasks).
 - Support multiple denominations or variable amounts.
 - Replace local trusted setup with a real ceremony.

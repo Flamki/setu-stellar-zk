@@ -1,0 +1,26 @@
+{
+  "circuit": "circuits/disclosure.circom",
+  "derivation": "auditorTag = Poseidon255(viewingKey, nullifierHash, receiptNonce)",
+  "legacyDerivation": "auditorTag = Poseidon255(viewingKey, nullifierHash)",
+  "provenance": "Computed with circuits/disclosure_witness.circom (and a 2-arity Poseidon255 for the legacy tag) from the sample inputs in circuits/disclosure_private.json. Prototype fixtures from the local single-contributor toolchain; they pin the v2 nonce/key derivation behavior, not ceremony quality.",
+  "base": {
+    "viewingKey": "99999",
+    "nullifierHash": "50965195888132986870075188991270610090721666015373119467878104864524153103363",
+    "legacyAuditorTag": "3785741437786175175007704804125457510124005247752304189622097515118393276679"
+  },
+  "cases": [
+    {
+      "receiptNonce": "31337",
+      "auditorTag": "48504087352648101872232104541849549896624195243212218591472176225635135984236"
+    },
+    {
+      "receiptNonce": "31338",
+      "auditorTag": "15314919175578150951171451108570970246129043498766752958988028327726546312632"
+    }
+  ],
+  "otherViewingKey": {
+    "viewingKey": "88888",
+    "receiptNonce": "31337",
+    "auditorTag": "34667577002964711384223170253437626583051352667368620898496226755031032468728"
+  }
+}

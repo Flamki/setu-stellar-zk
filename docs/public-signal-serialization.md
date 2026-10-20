@@ -159,32 +159,77 @@ four 32-byte big-endian Fr encodings (leading zeros allowed; e.g.
 ### Disclosure (`circuits/disclosure.circom`)
 
 ```circom
-component main {public [nullifierHash, commitment, discloseHash, auditorTag]} = Disclosure();
+component main {public [nullifierHash, commitment, discloseHash, auditorTag, receiptNonce]} = Disclosure();
 ```
 
-Canonical order (`n = 4`, all public inputs — no separate outputs):
+Canonical order (v2; `n = 5`, all public inputs — no separate outputs):
 
 | Index | Name | Role |
 | --- | --- | --- |
 | 0 | `nullifierHash` | Spent nullifier hash (must already be on-chain) |
 | 1 | `commitment` | Deposit leaf opening under disclosure |
 | 2 | `discloseHash` | Poseidon255(recipientId, purpose, value) |
-| 3 | `auditorTag` | Poseidon255(viewingKey, nullifierHash) |
+| 3 | `auditorTag` | Poseidon255(viewingKey, nullifierHash, receiptNonce) |
+| 4 | `receiptNonce` | Prover-chosen per-receipt nonce (public, not a secret) |
 
-Fresh testnet example:
+Fresh example (decimal Fr strings, same order as snarkjs `public.json`),
+recomputed from the sample private inputs in `circuits/disclosure_private.json`
+via the compute-only twin `circuits/disclosure_witness.circom`:
 
 ```json
 [
-  "33832171054643436472546998686772011210227251098487950275135154568712175384598",
-  "792451850146572312119437015092516461585820411321474856545290648487812800938",
-  "13601723215849916214344531109121559986847487952922840288412049033564696840611",
-  "49445820628079692271178516198415444927595013704302380125940463497865958044604"
+  "50965195888132986870075188991270610090721666015373119467878104864524153103363",
+  "13504266674507873070437848741371028790142490341642731696694125123435309057848",
+  "34148362321686645833561023478297102534116878299856681891161633532616282480240",
+  "48504087352648101872232104541849549896624195243212218591472176225635135984236",
+  "31337"
 ]
 ```
 
-Reordering these four values produces a different byte string and MUST fail
+Reordering these five values produces a different byte string and MUST fail
 verification against the disclosure VK (or fail contract semantic checks even if
 a forged layout somehow verified under a different key).
+
+#### Receipt nonce and tag derivation (v2)
+
+`receiptNonce` is the per-receipt domain separator that makes repeated
+disclosures of the **same** withdrawal separable (issue #3):
+
+- v1 tag: `auditorTag = Poseidon255(viewingKey, nullifierHash)` — deterministic
+  per (key, withdrawal); every repeated disclosure produced an identical tag.
+- v2 tag: `auditorTag = Poseidon255(viewingKey, nullifierHash, receiptNonce)` —
+  the prover picks a fresh `receiptNonce` per receipt, so two receipts with the
+  same `nullifierHash` and `viewingKey` carry different `auditorTag` values and
+  cannot be matched by comparing tags alone.
+
+The nonce is **public and not secret**: uniqueness is all it needs. It travels
+with the receipt (like the disclosed cleartext) so the auditor can recompute
+the tag with `circuits/auditor_recompute.circom`. The v1 and v2 tag values for
+the same inputs never collide, because they are different Poseidon arities;
+pinned examples live in `libs/zk/testdata/receipt_tags.json` and are checked by
+`cargo test -p zk`.
+
+Prototype limit: the circuit cannot force nonce freshness. A prover who reuses
+a nonce reproduces the v1 linkability for that pair of receipts; freshness is a
+prover-side discipline, not a proof guarantee.
+
+#### Compatibility with v1 (pre-nonce) staging receipts
+
+The earlier staging format had exactly four public signals
+`[nullifierHash, commitment, discloseHash, auditorTag]` with the deterministic
+v1 tag. Changing the circuit changed the verification key, so:
+
+- v1 receipts verify **only** under the archived v1 key, and v2 receipts only
+  under a v2 key. The Groth16 verifier requires
+  `pub_signals.len() + 1 == vk.ic.len()`, so a wrong-length vector under a given
+  key fails regardless of proof contents.
+- `verify_disclosure` accepts a 4- or 5-signal vector as a cheap pre-filter and
+  lets the installed key decide the format; historical v1 receipts are not
+  silently accepted by a v2 key.
+- Receipts produced by the pre-nonce testnet deployment
+  (`docs/`, README "Fresh disclosure public signals" before this change) are
+  v1 artifacts. Re-proving with the v2 circuit is required to use the nonce
+  derivation; there is no in-place upgrade of an existing Groth16 proof.
 
 ---
 
@@ -216,6 +261,10 @@ The following tests in `libs/zk/src/test.rs` pin this specification:
 | `test_disclosure_public_signal_order_encoding` | Disclosure index order + `n=4` header |
 | `test_withdrawal_public_signals_from_fixture` | Fixture → signal regeneration, order cross-checks (withdrawal) |
 | `test_disclosure_public_signals_from_fixture` | Fixture → signal regeneration, order cross-checks (disclosure) |
+| `test_receipt_tag_nonce_separates_repeated_disclosures` | v2 `receiptNonce` separates repeated disclosures (issue #3) |
+| `test_receipt_tag_viewing_key_and_nonce_both_change_tag` | `auditorTag` bound to viewing key and nonce |
+| `test_receipt_tag_is_stable_for_fixed_nonce_and_key` | Pinned v2 tag for fixed (key, nonce) |
+| `test_receipt_tag_v2_never_equals_v1_legacy_tag` | v1/v2 tag formats never collide |
 
 Run:
 

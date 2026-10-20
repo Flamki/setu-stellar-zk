@@ -41,7 +41,7 @@ The contract additionally enforces, independent of the proof:
 ### 2. Selective-disclosure receipt (`circuits/disclosure.circom`, verified in `verify_disclosure`)
 
 A valid receipt proof (public signals
-`[nullifierHash, commitment, discloseHash, auditorTag]`) proves that:
+`[nullifierHash, commitment, discloseHash, auditorTag, receiptNonce]`) proves that:
 
 - `nullifierHash = Poseidon255(nullifier)` for a private `nullifier` the
   prover knows.
@@ -51,8 +51,14 @@ A valid receipt proof (public signals
 - `discloseHash = Poseidon255(recipientId, purpose, value)` — the disclosed
   amount, recipient tag, and purpose are the exact values hashed into the
   receipt.
-- `auditorTag = Poseidon255(viewingKey, nullifierHash)` — the receipt is bound
-  to a viewing key the prover knows.
+- `auditorTag = Poseidon255(viewingKey, nullifierHash, receiptNonce)` — the
+  receipt is bound to a viewing key the prover knows **and** to a specific
+  disclosure event via the public per-receipt `receiptNonce`. Two receipts for
+  the same withdrawal with different nonces carry different tags, so comparing
+  `auditorTag` alone no longer links repeated disclosures. The earlier v1 tag
+  `Poseidon255(viewingKey, nullifierHash)` was deterministic per
+  (key, withdrawal); v1 receipts (four public signals) verify only under the
+  archived v1 verification key, never under a v2 key.
 
 `verify_disclosure` additionally checks, against the contract's own state:
 
@@ -101,6 +107,12 @@ matters most for compliance claims.
   holder of the matching `viewingKey` recognize a receipt intended for them.
   It does not prove the auditor is a licensed or registered entity, and it is
   not a verifiable credential.
+- **The receipt nonce is not enforced freshness.** `receiptNonce` lets an
+  honest prover separate repeated disclosures of the same withdrawal, but the
+  circuit cannot force the prover to pick a fresh nonce. A prover who reuses
+  one recreates the v1-era tag linkability for those receipts; uniqueness is a
+  prover-side discipline, not something the proof guarantees. The nonce is
+  public by design — it is a separator, not a secret.
 - `**Nothing links the receipt to a real-world person.**` No proof connects the
   deposit or withdrawal to a KYC'd identity, a bank account, or a regulated
   off-ramp. The proofs are purely cryptographic statements about on-chain

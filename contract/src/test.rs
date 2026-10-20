@@ -6,7 +6,7 @@ use core::str::FromStr;
 use soroban_sdk::testutils::{Address as TestAddress, Events};
 use soroban_sdk::{
     crypto::bls12_381::{Fr, G1Affine, G2Affine, G1_SERIALIZED_SIZE, G2_SERIALIZED_SIZE},
-    symbol_short, vec, Address, Bytes, BytesN, Env, IntoVal, String, U256, Val,
+    symbol_short, vec, Address, Bytes, BytesN, Env, IntoVal, String, Val, U256,
 };
 
 // Mock token contract for testing
@@ -218,6 +218,8 @@ fn init_pub_signals(env: &Env) -> Bytes {
     return pub_signals.to_bytes(env);
 }
 
+/// A 3-signal vector: neither the v1 (4) nor the v2 (5, with `receiptNonce`)
+/// disclosure format, so `verify_disclosure` must reject it (issue #3).
 fn init_malformed_disclosure_pub_signals(env: &Env) -> Bytes {
     let output = Vec::from_array(
         env,
@@ -406,6 +408,75 @@ fn test_verify_disclosure_rejects_truncated_bytes() {
     let proof = Bytes::from_array(&env, &[0u8; 1]);
     let pub_signals = Bytes::from_array(&env, &[0u8; 1]);
 
+    assert_eq!(client.verify_disclosure(&proof, &pub_signals), false);
+}
+
+/// Helper: serialize `n` canonical Fr signals (values 1..=n) with the real
+/// `PublicSignals` wire encoding, so tests can probe the accepted signal
+/// counts for the disclosure verifier.
+fn disclosure_pub_signals_of_len(env: &Env, n: u32) -> Bytes {
+    let mut pub_signals = Vec::new(env);
+    for i in 0..n {
+        pub_signals.push_back(Fr::from_u256(U256::from_u32(env, i + 1)));
+    }
+    PublicSignals { pub_signals }.to_bytes(env)
+}
+
+/// The v2 circuit appends the public per-receipt `receiptNonce`, so receipts
+/// now carry five public signals (`[nullifierHash, commitment, discloseHash,
+/// auditorTag, receiptNonce]`). The contract accepts 4 (v1 archived format)
+/// or 5 (v2) and lets the installed verification key decide which verifies;
+/// every other count is rejected up front (issue #3).
+#[test]
+fn test_verify_disclosure_rejects_wrong_signal_count() {
+    let env = Env::default();
+    let (_token_id, contract_id, admin) = setup_test_environment(&env);
+    let client = PrivacyPoolsContractClient::new(&env, &contract_id);
+
+    env.mock_all_auths();
+    client.set_disclosure_vk(&admin, &init_vk(&env));
+
+    let proof = init_proof(&env);
+
+    for n in [0u32, 1, 2, 3, 6, 7] {
+        let pub_signals = disclosure_pub_signals_of_len(&env, n);
+        assert_eq!(
+            client.verify_disclosure(&proof, &pub_signals),
+            false,
+            "disclosure must reject a {n}-signal vector (only 4 or 5 accepted)"
+        );
+    }
+}
+
+/// v1/v2 format boundary (issue #3): the v2 circuit appends the public
+/// per-receipt `receiptNonce`, so a v2 receipt carries five public signals.
+/// The contract accepts 4- or 5-signal vectors and lets the installed key pick
+/// the format, because the Groth16 verifier requires
+/// `pub_signals.len() + 1 == vk.ic.len()`. This test pins the gate with a
+/// 5-signal vector over an empty pool: shape is accepted, then the
+/// nullifier/commitment state checks reject it. Counts outside {4, 5} are
+/// refused before any Groth16 work (see
+/// `test_verify_disclosure_rejects_wrong_signal_count`).
+#[test]
+fn test_verify_disclosure_v2_signal_shape_reaches_state_checks() {
+    let env = Env::default();
+    let (_token_id, contract_id, admin) = setup_test_environment(&env);
+    let client = PrivacyPoolsContractClient::new(&env, &contract_id);
+
+    env.mock_all_auths();
+    client.set_disclosure_vk(&admin, &init_vk(&env));
+
+    let proof = init_proof(&env);
+
+    // A well-formed 5-signal (v2) vector: parseable and shape-accepted.
+    let pub_signals = disclosure_pub_signals_of_len(&env, 5);
+    assert!(
+        PublicSignals::from_bytes(&env, &pub_signals).is_ok(),
+        "a 5-signal v2 vector must be a valid PublicSignals encoding"
+    );
+
+    // No deposit and no spent nullifier in a fresh pool, so even though the
+    // 5-signal shape is accepted, the state checks reject the receipt.
     assert_eq!(client.verify_disclosure(&proof, &pub_signals), false);
 }
 

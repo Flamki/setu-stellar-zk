@@ -455,7 +455,11 @@ fn test_withdrawal_public_signal_order_encoding() {
 
     let mut hdr = [0u8; 4];
     encoded.slice(0..4).copy_into_slice(&mut hdr);
-    assert_eq!(hdr, [0u8, 0u8, 0u8, 4u8], "length prefix must be u32 BE n=4");
+    assert_eq!(
+        hdr,
+        [0u8, 0u8, 0u8, 4u8],
+        "length prefix must be u32 BE n=4"
+    );
 
     // withdrawnValue at index 1 → byte offset 4+32.
     let mut wv = [0u8; 32];
@@ -478,7 +482,7 @@ fn test_withdrawal_public_signal_order_encoding() {
 }
 
 /// Spec: docs/public-signal-serialization.md — Disclosure public order
-/// [nullifierHash, commitment, discloseHash, auditorTag].
+/// [nullifierHash, commitment, discloseHash, auditorTag, receiptNonce].
 #[test]
 fn test_disclosure_public_signal_order_encoding() {
     let env = Env::default();
@@ -487,29 +491,45 @@ fn test_disclosure_public_signal_order_encoding() {
     let commitment = Fr::from_u256(U256::from_u32(&env, 22));
     let disclose_hash = Fr::from_u256(U256::from_u32(&env, 33));
     let auditor_tag = Fr::from_u256(U256::from_u32(&env, 44));
+    let receipt_nonce = Fr::from_u256(U256::from_u32(&env, 55));
 
     let signals = PublicSignals {
         pub_signals: Vec::from_array(
             &env,
-            [nullifier_hash, commitment, disclose_hash, auditor_tag],
+            [
+                nullifier_hash,
+                commitment,
+                disclose_hash,
+                auditor_tag,
+                receipt_nonce,
+            ],
         ),
     };
 
     let encoded = signals.to_bytes(&env);
-    assert_eq!(encoded.len(), 4 + 4 * 32);
+    assert_eq!(encoded.len(), 4 + 5 * 32);
 
     let mut hdr = [0u8; 4];
     encoded.slice(0..4).copy_into_slice(&mut hdr);
-    assert_eq!(hdr, [0, 0, 0, 4]);
+    assert_eq!(hdr, [0, 0, 0, 5]);
 
-    for (idx, expected_low) in [(0u32, 11u8), (1, 22), (2, 33), (3, 44)] {
+    for (idx, expected_low) in [
+        (0u32, 11u8),
+        (1, 22),
+        (2, 33),
+        (3, 44),
+        (4, 55), // receiptNonce appended after the v1 four-signal order
+    ] {
         let start = 4 + idx * 32;
         let mut lane = [0u8; 32];
         encoded
             .slice(start..(start + 32))
             .copy_into_slice(&mut lane);
         assert!(lane[..31].iter().all(|b| *b == 0));
-        assert_eq!(lane[31], expected_low, "disclosure signal index ordering mismatch");
+        assert_eq!(
+            lane[31], expected_low,
+            "disclosure signal index ordering mismatch"
+        );
     }
 
     // Exact-length rule: trailing garbage → MalformedPublicSignals.
@@ -548,8 +568,13 @@ const WITHDRAWAL_SIGNAL_ORDER: [&str; 4] = [
     "associationRoot",
 ];
 
-const DISCLOSURE_SIGNAL_ORDER: [&str; 4] =
-    ["nullifierHash", "commitment", "discloseHash", "auditorTag"];
+const DISCLOSURE_SIGNAL_ORDER: [&str; 5] = [
+    "nullifierHash",
+    "commitment",
+    "discloseHash",
+    "auditorTag",
+    "receiptNonce",
+];
 
 const WITHDRAWAL_CIRCUIT_REL: &str = "circuits/main.circom";
 const DISCLOSURE_CIRCUIT_REL: &str = "circuits/disclosure.circom";
@@ -557,6 +582,7 @@ const SPEC_REL: &str = "docs/public-signal-serialization.md";
 
 const WITHDRAWAL_FIXTURE_JSON: &str = include_str!("../testdata/public_signals/withdrawal.json");
 const DISCLOSURE_FIXTURE_JSON: &str = include_str!("../testdata/public_signals/disclosure.json");
+const RECEIPT_TAGS_FIXTURE_JSON: &str = include_str!("../testdata/receipt_tags.json");
 const WITHDRAWAL_CIRCUIT_SRC: &str = include_str!("../../../circuits/main.circom");
 const DISCLOSURE_CIRCUIT_SRC: &str = include_str!("../../../circuits/disclosure.circom");
 const SPEC_DOC: &str = include_str!("../../../docs/public-signal-serialization.md");
@@ -812,4 +838,200 @@ fn test_disclosure_public_signals_from_fixture() {
         DISCLOSURE_CIRCUIT_REL,
     );
     assert_fixture_wire_order(&env, &fixture, &DISCLOSURE_SIGNAL_ORDER);
+}
+
+// ---------------------------------------------------------------------------
+// Receipt auditor-tag derivation, v2 (issue #3).
+//
+// auditorTag = Poseidon255(viewingKey, nullifierHash, receiptNonce). The
+// per-receipt nonce is the domain separator that lets two receipts for the
+// SAME withdrawal (same nullifierHash, same viewingKey) carry different
+// auditorTags, so comparing tags alone no longer links repeated disclosures.
+// The v1 formula was Poseidon255(viewingKey, nullifierHash): deterministic per
+// (key, withdrawal), so every repeated disclosure produced an identical tag.
+//
+// Fixture: libs/zk/testdata/receipt_tags.json, computed with
+// circuits/disclosure_witness.circom from circuits/disclosure_private.json
+// sample inputs (plus a 2-arity Poseidon255 for the legacy tag). These tests
+// pin the derivation format: if the circuit's tag formula, arity, or operand
+// order changes, the regenerated values will no longer match. Prototype limit:
+// the circuit cannot force a fresh nonce — a prover who reuses one recreates
+// v1 linkability; freshness is a prover-side discipline, not a proof
+// guarantee.
+// ---------------------------------------------------------------------------
+
+struct ReceiptTagFixture {
+    viewing_key: String,
+    nullifier_hash: String,
+    legacy_auditor_tag: String,
+    case_nonces: std::vec::Vec<String>,
+    case_tags: std::vec::Vec<String>,
+    other_viewing_key: String,
+    other_nonce: String,
+    other_tag: String,
+}
+
+fn parse_receipt_tag_fixture(raw: &str) -> ReceiptTagFixture {
+    let json: serde_json::Value = serde_json::from_str(raw).expect("fixture is valid JSON");
+    let base = json.get("base").expect("fixture must have `base`");
+    let cases = json
+        .get("cases")
+        .and_then(|value| value.as_array())
+        .expect("`cases` must be an array");
+    let other = json
+        .get("otherViewingKey")
+        .expect("fixture must have `otherViewingKey`");
+
+    let mut case_nonces = std::vec::Vec::new();
+    let mut case_tags = std::vec::Vec::new();
+    for case in cases {
+        case_nonces.push(json_text_field(case, "receiptNonce"));
+        case_tags.push(json_text_field(case, "auditorTag"));
+    }
+
+    ReceiptTagFixture {
+        viewing_key: json_text_field(base, "viewingKey"),
+        nullifier_hash: json_text_field(base, "nullifierHash"),
+        legacy_auditor_tag: json_text_field(base, "legacyAuditorTag"),
+        case_nonces,
+        case_tags,
+        other_viewing_key: json_text_field(other, "viewingKey"),
+        other_nonce: json_text_field(other, "receiptNonce"),
+        other_tag: json_text_field(other, "auditorTag"),
+    }
+}
+
+#[test]
+fn test_receipt_tag_nonce_separates_repeated_disclosures() {
+    let fixture = parse_receipt_tag_fixture(RECEIPT_TAGS_FIXTURE_JSON);
+
+    assert!(
+        fixture.case_nonces.len() >= 2,
+        "fixture needs at least two nonces for the same (viewingKey, nullifierHash)"
+    );
+
+    // Same viewing key + same withdrawal, different nonces -> different tags.
+    // This is the property that separates repeated disclosures (issue #3).
+    for (i, tag_i) in fixture.case_tags.iter().enumerate() {
+        for (j, tag_j) in fixture.case_tags.iter().enumerate() {
+            if i != j {
+                assert_ne!(
+                    tag_i,
+                    tag_j,
+                    "receiptNonce {a} and {b} for the same withdrawal must produce \
+                     different auditorTags (reuse of a nonce would recreate v1 \
+                     linkability)",
+                    a = fixture.case_nonces[i],
+                    b = fixture.case_nonces[j]
+                );
+            }
+        }
+    }
+
+    // Every tag must be a canonical Fr so it lands on the wire as one 32-byte
+    // lane, exactly like the public signals it ships in.
+    for tag in fixture
+        .case_tags
+        .iter()
+        .chain(std::iter::once(&fixture.legacy_auditor_tag))
+    {
+        let bytes = decimal_to_be_bytes(tag);
+        assert!(
+            is_canonical_fr_bytes_for_fixture(&bytes),
+            "fixture tag {tag} must be a canonical BLS12-381 scalar"
+        );
+    }
+}
+
+#[test]
+fn test_receipt_tag_viewing_key_and_nonce_both_change_tag() {
+    let fixture = parse_receipt_tag_fixture(RECEIPT_TAGS_FIXTURE_JSON);
+
+    // A different viewing key with a reused nonce must also produce a
+    // different tag: the tag is bound to the key, not just to the nonce.
+    assert_ne!(
+        fixture.other_tag, fixture.case_tags[0],
+        "different viewingKey with the same receiptNonce must produce a \
+         different auditorTag"
+    );
+    for tag in &fixture.case_tags {
+        assert_ne!(
+            fixture.other_tag.as_str(),
+            tag.as_str(),
+            "other-viewing-key tag must not collide with any base-key tag"
+        );
+    }
+
+    // The nonce is deliberately held constant so the tag difference is
+    // attributable to the viewing key alone.
+    assert_eq!(
+        fixture.other_nonce, fixture.case_nonces[0],
+        "otherViewingKey case must reuse the base nonce to isolate the key"
+    );
+}
+
+#[test]
+fn test_receipt_tag_is_stable_for_fixed_nonce_and_key() {
+    let fixture = parse_receipt_tag_fixture(RECEIPT_TAGS_FIXTURE_JSON);
+
+    // Re-deriving with the SAME nonce and key must reproduce the SAME tag —
+    // otherwise an auditor could never recompute it from the receipt. The
+    // pinned value is the ground truth from the circuit twin; the pairing
+    // below documents the exact inputs it commits to.
+    assert_eq!(
+        fixture.case_nonces[0], "31337",
+        "base case must stay aligned with circuits/disclosure_private.json"
+    );
+    assert_eq!(
+        fixture.viewing_key, "99999",
+        "base case must stay aligned with circuits/disclosure_private.json"
+    );
+    assert_eq!(
+        fixture.case_tags[0],
+        "48504087352648101872232104541849549896624195243212218591472176225635135984236",
+        "auditorTag must remain Poseidon255(viewingKey=99999, nullifierHash, receiptNonce=31337)"
+    );
+}
+
+#[test]
+fn test_receipt_tag_v2_never_equals_v1_legacy_tag() {
+    let fixture = parse_receipt_tag_fixture(RECEIPT_TAGS_FIXTURE_JSON);
+
+    // The v1 tag for the same (viewingKey, nullifierHash) is pinned from the
+    // 2-arity Poseidon255. It must not appear anywhere in the v2 set: v1 and
+    // v2 receipts for the same withdrawal are separated by derivation format,
+    // so a v2 tag can never be mistaken for (or replayed as) a v1 tag.
+    assert_ne!(
+        fixture.legacy_auditor_tag, fixture.case_tags[0],
+        "v1 Poseidon255(viewingKey, nullifierHash) must differ from the v2 \
+         nonce-derived tag for the same inputs"
+    );
+    for tag in &fixture.case_tags {
+        assert_ne!(
+            tag, &fixture.legacy_auditor_tag,
+            "no v2 nonce-derived tag may equal the v1 legacy tag"
+        );
+    }
+    assert_ne!(fixture.legacy_auditor_tag, fixture.other_tag);
+}
+
+/// Fixture values are checked against the same canonical-scalar rule the
+/// on-chain `PublicSignals` decoder enforces (`libs/zk/src/lib.rs`).
+fn is_canonical_fr_bytes_for_fixture(bytes: &[u8; 32]) -> bool {
+    // BLS12-381 scalar modulus r (big-endian), mirroring
+    // `is_canonical_fr_bytes` in the crate root.
+    const R: [u8; 32] = [
+        0x73, 0xed, 0xa7, 0x53, 0x29, 0x9d, 0x7d, 0x48, 0x33, 0x39, 0xd8, 0x08, 0x09, 0xa1, 0xd8,
+        0x05, 0x53, 0xbd, 0xa4, 0x02, 0xff, 0xfe, 0x5b, 0xfe, 0xff, 0xff, 0xff, 0xff, 0x00, 0x00,
+        0x00, 0x01,
+    ];
+    for i in 0..32 {
+        if bytes[i] < R[i] {
+            return true;
+        }
+        if bytes[i] > R[i] {
+            return false;
+        }
+    }
+    false // equal to r -> non-canonical
 }
