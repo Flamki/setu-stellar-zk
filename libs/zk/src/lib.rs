@@ -249,4 +249,7 @@ impl Groth16Verifier {
 }
 
 #[cfg(test)]
+extern crate std;
+
+#[cfg(test)]
 mod test;

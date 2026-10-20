@@ -1,0 +1,17 @@
+{
+  "circuit": "circuits/disclosure.circom",
+  "spec": "docs/public-signal-serialization.md",
+  "order": [
+    "nullifierHash",
+    "commitment",
+    "discloseHash",
+    "auditorTag"
+  ],
+  "public_signals": [
+    "33832171054643436472546998686772011210227251098487950275135154568712175384598",
+    "792451850146572312119437015092516461585820411321474856545290648487812800938",
+    "13601723215849916214344531109121559986847487952922840288412049033564696840611",
+    "49445820628079692271178516198415444927595013704302380125940463497865958044604"
+  ],
+  "provenance": "snarkjs public.json order for circuits/disclosure.circom: no circuit outputs, so the four main {public [...]} inputs in declaration order. Values are the fresh testnet disclosure signals recorded in README.md. Prototype fixture: they come from the local/staging single-contributor trusted setup, not a production ceremony."
+}

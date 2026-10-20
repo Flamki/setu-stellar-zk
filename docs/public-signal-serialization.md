@@ -115,6 +115,15 @@ snarkjs / Circom emit public signals as **circuit outputs first**, then
 **public inputs** in declaration order. On-chain `PublicSignals` MUST preserve
 that order when serialized: `pub[0]` is the first snarkjs public value.
 
+Machine-readable copies of both orders and their testnet values live in
+`libs/zk/testdata/public_signals/{withdrawal,disclosure}.json`. The tests
+`test_withdrawal_public_signals_from_fixture` and
+`test_disclosure_public_signals_from_fixture` regenerate `PublicSignals` from
+those fixtures and cross-check this document, the Circom sources, and the
+README, so reordering a signal anywhere fails `cargo test -p zk`. The fixture
+values are prototype data from the local/staging trusted setup; they pin
+ordering, not ceremony quality.
+
 ### Withdrawal (`circuits/main.circom`)
 
 ```circom
@@ -205,6 +214,8 @@ The following tests in `libs/zk/src/test.rs` pin this specification:
 | `test_public_signals_reject_truncated_payload` | MalformedPublicSignals |
 | `test_withdrawal_public_signal_order_encoding` | Withdrawal index order + `n=4` header |
 | `test_disclosure_public_signal_order_encoding` | Disclosure index order + `n=4` header |
+| `test_withdrawal_public_signals_from_fixture` | Fixture → signal regeneration, order cross-checks (withdrawal) |
+| `test_disclosure_public_signals_from_fixture` | Fixture → signal regeneration, order cross-checks (disclosure) |
 
 Run:
 

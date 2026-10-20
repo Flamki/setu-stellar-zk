@@ -7,6 +7,7 @@ use soroban_sdk::{
     Bytes, Env, U256, Vec,
     crypto::bls12_381::{Fr, G1_SERIALIZED_SIZE, G1Affine, G2_SERIALIZED_SIZE, G2Affine},
 };
+use std::{format, string::String, string::ToString};
 
 use crate::{Groth16Error, Groth16Verifier, Proof, PublicSignals, VerificationKey};
 
@@ -521,4 +522,294 @@ fn test_disclosure_public_signal_order_encoding() {
 
     let roundtrip = PublicSignals::from_bytes(&env, &encoded).unwrap();
     assert_eq!(signals.pub_signals, roundtrip.pub_signals);
+}
+
+// ---------------------------------------------------------------------------
+// Generated public-signal ordering tests (issue #21).
+//
+// Fixtures live in libs/zk/testdata/public_signals/ and carry the snarkjs
+// `public.json` value order for each circuit. These tests regenerate
+// `PublicSignals` from those fixtures and pin the exact index order and wire
+// length against three sources that must all agree:
+//   1. the order constants below (the protocol pin),
+//   2. the Circom source (outputs first, then `component main {public [...]}`),
+//   3. docs/public-signal-serialization.md and README.md.
+// Reordering a signal in any of them fails the matching assertion.
+//
+// Prototype limit: the fixture values are captured from the local/staging
+// single-contributor trusted setup (see each fixture's "provenance" field).
+// These tests pin ordering, not proof soundness or ceremony quality.
+// ---------------------------------------------------------------------------
+
+const WITHDRAWAL_SIGNAL_ORDER: [&str; 4] = [
+    "nullifierHash",
+    "withdrawnValue",
+    "stateRoot",
+    "associationRoot",
+];
+
+const DISCLOSURE_SIGNAL_ORDER: [&str; 4] =
+    ["nullifierHash", "commitment", "discloseHash", "auditorTag"];
+
+const WITHDRAWAL_CIRCUIT_REL: &str = "circuits/main.circom";
+const DISCLOSURE_CIRCUIT_REL: &str = "circuits/disclosure.circom";
+const SPEC_REL: &str = "docs/public-signal-serialization.md";
+
+const WITHDRAWAL_FIXTURE_JSON: &str = include_str!("../testdata/public_signals/withdrawal.json");
+const DISCLOSURE_FIXTURE_JSON: &str = include_str!("../testdata/public_signals/disclosure.json");
+const WITHDRAWAL_CIRCUIT_SRC: &str = include_str!("../../../circuits/main.circom");
+const DISCLOSURE_CIRCUIT_SRC: &str = include_str!("../../../circuits/disclosure.circom");
+const SPEC_DOC: &str = include_str!("../../../docs/public-signal-serialization.md");
+const README_DOC: &str = include_str!("../../../README.md");
+
+struct PublicSignalFixture {
+    circuit: String,
+    spec: String,
+    order: std::vec::Vec<String>,
+    public_signals: std::vec::Vec<String>,
+}
+
+fn json_text_field(json: &serde_json::Value, name: &str) -> String {
+    match json.get(name).and_then(|value| value.as_str()) {
+        Some(text) => text.to_string(),
+        None => panic!("fixture field `{name}` must be a string"),
+    }
+}
+
+fn json_string_array_field(json: &serde_json::Value, name: &str) -> std::vec::Vec<String> {
+    let entries = match json.get(name).and_then(|value| value.as_array()) {
+        Some(entries) => entries,
+        None => panic!("fixture field `{name}` must be an array of strings"),
+    };
+    entries
+        .iter()
+        .map(|entry| match entry.as_str() {
+            Some(text) => text.to_string(),
+            None => panic!("`{name}` entries must be strings"),
+        })
+        .collect()
+}
+
+fn parse_public_signal_fixture(raw: &str) -> PublicSignalFixture {
+    let json: serde_json::Value = serde_json::from_str(raw).expect("fixture is valid JSON");
+    PublicSignalFixture {
+        circuit: json_text_field(&json, "circuit"),
+        spec: json_text_field(&json, "spec"),
+        order: json_string_array_field(&json, "order"),
+        public_signals: json_string_array_field(&json, "public_signals"),
+    }
+}
+
+/// snarkjs / Circom emit public signals as circuit outputs first, then public
+/// inputs in `component main {public [...]}` declaration order. Rebuild that
+/// order from the circuit source so an edit to the `.circom` file is caught.
+fn circuit_public_signal_order(circuit_src: &str) -> std::vec::Vec<String> {
+    let mut order = std::vec::Vec::new();
+
+    for line in circuit_src.lines() {
+        let line = line.trim();
+        if let Some(rest) = line.strip_prefix("signal output ") {
+            let name = rest
+                .split(|c: char| c.is_whitespace() || c == ';' || c == '[')
+                .next()
+                .unwrap_or("");
+            if !name.is_empty() {
+                order.push(name.to_string());
+            }
+        }
+    }
+
+    let marker = "{public [";
+    let start = circuit_src
+        .find(marker)
+        .unwrap_or_else(|| panic!("circuit must declare `component main {{public [...]}}`"));
+    let rest = &circuit_src[start + marker.len()..];
+    let end = rest
+        .find(']')
+        .unwrap_or_else(|| panic!("public input list must be closed"));
+    for name in rest[..end].split(',') {
+        order.push(name.trim().to_string());
+    }
+
+    order
+}
+
+/// Decimal snarkjs value -> 32-byte big-endian Fr encoding (overflow checked).
+fn decimal_to_be_bytes(dec: &str) -> [u8; 32] {
+    assert!(!dec.is_empty(), "public signal must not be empty");
+    let mut out = [0u8; 32];
+    for byte in dec.bytes() {
+        assert!(
+            byte.is_ascii_digit(),
+            "public signal `{dec}` must be a decimal integer"
+        );
+        let mut carry = u32::from(byte - b'0');
+        for slot in out.iter_mut().rev() {
+            let value = u32::from(*slot) * 10 + carry;
+            *slot = value as u8;
+            carry = value >> 8;
+        }
+        assert_eq!(carry, 0, "public signal `{dec}` does not fit in 32 bytes");
+    }
+    out
+}
+
+fn fr_from_decimal(env: &Env, dec: &str) -> Fr {
+    Fr::from_u256(U256::from_be_bytes(
+        env,
+        &Bytes::from_array(env, &decimal_to_be_bytes(dec)),
+    ))
+}
+
+/// The fixture, the circuit source, the spec table and the README must all
+/// state the same order, and the fixture must carry one value per signal.
+fn assert_fixture_pins_order(
+    fixture: &PublicSignalFixture,
+    pinned_order: &[&str],
+    circuit_src: &str,
+    circuit_rel: &str,
+) {
+    let fixture_order: std::vec::Vec<&str> = fixture.order.iter().map(String::as_str).collect();
+    assert_eq!(
+        fixture_order, pinned_order,
+        "fixture signal order for {circuit_rel} changed; this pin exists to catch \
+         accidental reordering (see {SPEC_REL})"
+    );
+
+    assert_eq!(
+        fixture.circuit, circuit_rel,
+        "fixture must point at its Circom source"
+    );
+    assert_eq!(
+        fixture.spec, SPEC_REL,
+        "fixture must point at the ordering spec it documents"
+    );
+
+    let circuit_order = circuit_public_signal_order(circuit_src);
+    let circuit_order: std::vec::Vec<&str> = circuit_order.iter().map(String::as_str).collect();
+    assert_eq!(
+        circuit_order, pinned_order,
+        "{circuit_rel} public signal order changed (outputs first, then main {{public [...]}})"
+    );
+
+    for (index, name) in pinned_order.iter().enumerate() {
+        let row = format!("| {index} | `{name}` |");
+        assert!(
+            SPEC_DOC.contains(&row),
+            "{SPEC_REL} must document `{name}` at index {index} as the table row `{row}`"
+        );
+    }
+    assert!(
+        SPEC_DOC.contains(circuit_rel),
+        "{SPEC_REL} must reference {circuit_rel}"
+    );
+
+    let readme_order = format!("[{}]", pinned_order.join(", "));
+    assert!(
+        README_DOC.contains(&readme_order),
+        "README.md must document the {circuit_rel} signal order as `{readme_order}`"
+    );
+
+    assert_eq!(
+        fixture.public_signals.len(),
+        pinned_order.len(),
+        "fixture must carry exactly one value per public signal for {circuit_rel}"
+    );
+
+    assert_docs_quote_values_in_order(README_DOC, "README.md", fixture);
+    assert_docs_quote_values_in_order(SPEC_DOC, SPEC_REL, fixture);
+}
+
+/// The README and the spec quote the fixture values as snarkjs-style decimal
+/// arrays. Each value must still appear in fixture order, so swapping the
+/// value at an index fails here even when the signal names are untouched.
+fn assert_docs_quote_values_in_order(doc: &str, doc_rel: &str, fixture: &PublicSignalFixture) {
+    let mut cursor = 0usize;
+    for (index, value) in fixture.public_signals.iter().enumerate() {
+        match doc[cursor..].find(value.as_str()) {
+            Some(offset) => cursor += offset + value.len(),
+            None => panic!(
+                "{doc_rel} must quote the {circuit} fixture value at index {index} \
+                 ({value}) in the same order as the fixture",
+                circuit = fixture.circuit
+            ),
+        }
+    }
+}
+
+/// Regenerate `PublicSignals` from the fixture values and check the encoded
+/// order: length prefix `n`, then n x 32-byte big-endian lanes, with value i
+/// in lane i. Swapping two fixture values (or two signals) fails here.
+fn assert_fixture_wire_order(env: &Env, fixture: &PublicSignalFixture, pinned_order: &[&str]) {
+    let mut pub_signals = Vec::new(env);
+    for dec in &fixture.public_signals {
+        pub_signals.push_back(fr_from_decimal(env, dec));
+    }
+    let signals = PublicSignals { pub_signals };
+
+    let n = fixture.public_signals.len();
+    let encoded = signals.to_bytes(env);
+    assert_eq!(
+        encoded.len(),
+        (4 + 32 * n) as u32,
+        "wire length must be 4 + 32 * {n} for {circuit}",
+        circuit = fixture.circuit
+    );
+
+    let mut header = [0u8; 4];
+    encoded.slice(0..4).copy_into_slice(&mut header);
+    assert_eq!(
+        u32::from_be_bytes(header),
+        n as u32,
+        "length prefix must be u32 big-endian n = {n}"
+    );
+
+    for (index, (name, dec)) in pinned_order
+        .iter()
+        .zip(fixture.public_signals.iter())
+        .enumerate()
+    {
+        let start = (4 + 32 * index) as u32;
+        let mut lane = [0u8; 32];
+        encoded
+            .slice(start..(start + 32))
+            .copy_into_slice(&mut lane);
+        assert_eq!(
+            lane,
+            decimal_to_be_bytes(dec),
+            "signal index {index} (`{name}`) must land in byte lane {index}"
+        );
+    }
+
+    let roundtrip = PublicSignals::from_bytes(env, &encoded).unwrap();
+    assert_eq!(roundtrip.pub_signals.len(), n as u32);
+    assert_eq!(roundtrip.pub_signals, signals.pub_signals);
+}
+
+#[test]
+fn test_withdrawal_public_signals_from_fixture() {
+    let env = Env::default();
+    let fixture = parse_public_signal_fixture(WITHDRAWAL_FIXTURE_JSON);
+
+    assert_fixture_pins_order(
+        &fixture,
+        &WITHDRAWAL_SIGNAL_ORDER,
+        WITHDRAWAL_CIRCUIT_SRC,
+        WITHDRAWAL_CIRCUIT_REL,
+    );
+    assert_fixture_wire_order(&env, &fixture, &WITHDRAWAL_SIGNAL_ORDER);
+}
+
+#[test]
+fn test_disclosure_public_signals_from_fixture() {
+    let env = Env::default();
+    let fixture = parse_public_signal_fixture(DISCLOSURE_FIXTURE_JSON);
+
+    assert_fixture_pins_order(
+        &fixture,
+        &DISCLOSURE_SIGNAL_ORDER,
+        DISCLOSURE_CIRCUIT_SRC,
+        DISCLOSURE_CIRCUIT_REL,
+    );
+    assert_fixture_wire_order(&env, &fixture, &DISCLOSURE_SIGNAL_ORDER);
 }
