@@ -8,6 +8,10 @@
 //! corresponds to a real deposit and that the disclosed amount equals the
 //! committed value. The current testnet build treats recipient and purpose as
 //! prover-asserted context hashed into the receipt, not deposit-time facts.
+//! Each receipt carries a public per-receipt `receiptNonce` so the auditor tag
+//! `Poseidon255(viewingKey, nullifierHash, receiptNonce)` separates repeated
+//! disclosures of the same withdrawal (v1 receipts without a nonce remain
+//! verifiable only under the archived v1 key; see `verify_disclosure`).
 //!
 //! # Verification-key commitments
 //!
@@ -75,7 +79,21 @@ impl PrivacyPoolsContract {
     /// Verify a selective-disclosure receipt against the contract's own state.
     ///
     /// Public signals (must match circuits/disclosure.circom order):
-    ///   [nullifierHash, commitment, discloseHash, auditorTag]
+    ///   [nullifierHash, commitment, discloseHash, auditorTag, receiptNonce]
+    ///
+    /// COMPATIBILITY: v1 staging receipts carried four signals
+    /// `[nullifierHash, commitment, discloseHash, auditorTag]` with the
+    /// deterministic tag `Poseidon255(viewingKey, nullifierHash)`. The v2
+    /// circuit adds the public per-receipt `receiptNonce` and derives
+    /// `auditorTag = Poseidon255(viewingKey, nullifierHash, receiptNonce)`,
+    /// so two receipts for the same withdrawal can be separated by nonce.
+    /// Both lengths are accepted here on purpose: which length verifies is
+    /// decided by the installed verification key, because the Groth16
+    /// verifier requires `pub_signals.len() + 1 == vk.ic.len()`. Install the
+    /// archived v1 key to check historical v1 receipts, or the v2 key for
+    /// nonce-separated receipts — never both at once. A v1-format vector
+    /// under a v2 key (or vice versa) fails the `ic` length check and returns
+    /// false.
     ///
     /// Returns true iff, trustlessly:
     ///   1. `nullifierHash` is an already-spent withdrawal in THIS pool, and
@@ -83,9 +101,12 @@ impl PrivacyPoolsContract {
     ///   3. the Groth16 receipt proof verifies under the disclosure VK.
     ///
     /// The auditor separately (off-chain) recomputes `discloseHash` from the
-    /// disclosed cleartext and `auditorTag` from their viewing key. In v1 this
-    /// checks the disclosed context is the one hashed into the receipt; it does
-    /// not prove recipient or purpose were committed at deposit time.
+    /// disclosed cleartext and `auditorTag` from their viewing key plus the
+    /// receipt's public `receiptNonce` (see
+    /// circuits/auditor_recompute.circom). In v1/v2 this checks the disclosed
+    /// context is the one hashed into the receipt; it does not prove recipient
+    /// or purpose were committed at deposit time. The circuit cannot force a
+    /// fresh nonce: a prover who reuses one recreates v1-era tag linkability.
     ///
     /// PRIVACY: invoking this on-chain publishes the nullifierHash<->commitment
     /// link to everyone. For a single regulator prefer the off-chain check;
@@ -114,7 +135,11 @@ impl PrivacyPoolsContract {
             Err(_) => return false,
         };
 
-        if pub_signals.pub_signals.len() != 4 {
+        // v1 receipts carry 4 signals, v2 receipts carry 5 (receiptNonce
+        // appended). The installed VK discriminates via `ic.len()`; this
+        // length gate only rejects anything that is neither format.
+        let len = pub_signals.pub_signals.len();
+        if len != 4 && len != 5 {
             return false;
         }
         let nullifier_hash = pub_signals.pub_signals.get(0).unwrap().to_bytes();

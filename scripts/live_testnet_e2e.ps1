@@ -118,6 +118,11 @@ if (-not $proofHex -or -not $publicHex) { throw "failed to extract withdrawal pr
 & $Stellar contract invoke --id $ContractId --source $Source --network $Network -- withdraw --to $Source --proof_bytes $proofHex --pub_signals_bytes $publicHex
 
 $withdrawPublic = Get-Content -Raw -LiteralPath circuits/main_public.json | ConvertFrom-Json
+# Fresh per-receipt nonce (issue #3): public, only needs to be unique per
+# receipt. A timestamp keeps each run's auditorTag distinct for the same
+# withdrawal, demonstrating the v2 nonce separation end to end.
+$receiptNonce = [string][DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
+Write-Host "receiptNonce: $receiptNonce"
 $private = [ordered]@{
     value = [string]$coinFile.coin.value
     label = [string]$coinFile.coin.label
@@ -126,6 +131,7 @@ $private = [ordered]@{
     recipientId = "11111"
     purpose = "7"
     viewingKey = "99999"
+    receiptNonce = $receiptNonce
 } | ConvertTo-Json -Depth 4
 Set-Content -LiteralPath circuits/build_disc/fresh_private.json -Value $private
 

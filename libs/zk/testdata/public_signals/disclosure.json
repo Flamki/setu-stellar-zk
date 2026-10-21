@@ -5,13 +5,15 @@
     "nullifierHash",
     "commitment",
     "discloseHash",
-    "auditorTag"
+    "auditorTag",
+    "receiptNonce"
   ],
   "public_signals": [
-    "33832171054643436472546998686772011210227251098487950275135154568712175384598",
-    "792451850146572312119437015092516461585820411321474856545290648487812800938",
-    "13601723215849916214344531109121559986847487952922840288412049033564696840611",
-    "49445820628079692271178516198415444927595013704302380125940463497865958044604"
+    "50965195888132986870075188991270610090721666015373119467878104864524153103363",
+    "13504266674507873070437848741371028790142490341642731696694125123435309057848",
+    "34148362321686645833561023478297102534116878299856681891161633532616282480240",
+    "48504087352648101872232104541849549896624195243212218591472176225635135984236",
+    "31337"
   ],
-  "provenance": "snarkjs public.json order for circuits/disclosure.circom: no circuit outputs, so the four main {public [...]} inputs in declaration order. Values are the fresh testnet disclosure signals recorded in README.md. Prototype fixture: they come from the local/staging single-contributor trusted setup, not a production ceremony."
+  "provenance": "snarkjs public.json order for circuits/disclosure.circom (v2, receipt nonce): no circuit outputs, so the five main {public [...]} inputs in declaration order. Values are recomputed with circuits/disclosure_witness.circom from the documented sample private inputs in circuits/disclosure_private.json (receiptNonce 31337). Prototype fixture from the local single-contributor toolchain, not a production ceremony; it pins ordering and the v2 tag derivation, not ceremony quality. The earlier 4-signal v1 fixture (Poseidon255(viewingKey, nullifierHash) tag, no nonce) is superseded; v1 receipts verify only under the archived v1 key."
 }
