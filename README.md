@@ -265,6 +265,22 @@ for `snarkjs`/`circomlib`), it doesn't install or sandbox anything.
 
 ### Regenerate circuit artifacts
 
+For the disclosure regression test report, including circuit diagrams, test
+results, and amount-representation limits, see
+[Disclosure Security Test Report](docs/disclosure-security-tests.md):
+
+```bash
+npm ci --prefix circuits/test
+npm run test:runner --prefix circuits/test
+npm run test:disclosure --prefix circuits/test
+```
+
+It requires Node.js and Circom 2.2.x, uses no testnet, and preserves each run's
+actual results under `circuits/build_disc/disclosure-tests/`. The generated
+keys are local test keys only, not a production trusted setup.
+The suite targets the v2 five-signal receipt format and also rejects a changed
+public `receiptNonce` without altering the original proof.
+
 One command rebuilds both circuit artifact sets (withdrawal and selective
 disclosure) from a fresh clone:
 

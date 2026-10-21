@@ -18,3 +18,42 @@ jobs:
         run: bash scripts/build-circuits.sh --help
       - name: Dry run (no toolchain required)
         run: bash scripts/build-circuits.sh --dry-run --all
+
+  disclosure-security-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: circuits/test/package-lock.json
+      - name: Install Circom 2.2.2
+        run: |
+          mkdir -p "$RUNNER_TEMP/circom-bin"
+          curl --fail --location --silent --show-error \
+            https://github.com/iden3/circom/releases/download/v2.2.2/circom-linux-amd64 \
+            --output "$RUNNER_TEMP/circom-bin/circom"
+          chmod +x "$RUNNER_TEMP/circom-bin/circom"
+          echo "$RUNNER_TEMP/circom-bin" >> "$GITHUB_PATH"
+      - name: Install pinned circuit test dependencies
+        run: npm ci --prefix circuits/test
+      - name: Test command failures and timeouts
+        run: npm run test:runner --prefix circuits/test
+      - name: Test disclosure amount binding
+        run: npm run test:disclosure --prefix circuits/test
+      - name: Preserve actual disclosure test evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: disclosure-security-results
+          path: |
+            circuits/build_disc/disclosure-tests/
+            circuits/build_disc/process-tests/
+          if-no-files-found: warn
+          retention-days: 7
