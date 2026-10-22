@@ -107,82 +107,84 @@ The `test_merkleProof.circom` circuit:
 
 ## Poseidon Compatibility Test
 
-This directory also contains a compatibility test for the `poseidon255.circom` circuit, which verifies that the Rust `poseidon` crate produces identical hash outputs to the Circom implementation.
+This directory also contains a manual compatibility test for the `poseidon255.circom` circuit, which compares hash outputs from the Rust `soroban-poseidon` crate with the Circom implementation. The automated regression suite is documented under [Poseidon Parity Vectors](#poseidon-parity-vectors).
 
 ### Overview
 
 The Poseidon compatibility test ensures consistency between:
-1. **Rust Implementation**: `poseidon` crate with `Poseidon255` implementation
+1. **Rust Implementation**: `soroban-poseidon` crate with BLS12-381 scalar field parameters
 2. **Circom Implementation**: `poseidon255.circom` circuit
 
 This is crucial for maintaining consistency between the Rust implementation (used in the main application) and the Circom implementation (used in zero-knowledge proofs).
 
 ### Test Files
 
-#### 1. `test/test_poseidon.circom`
+#### 1. `test_poseidon.circom`
 The main test circuit that includes:
 - `TestPoseidon`: Tests both single and two-input hashing
 - **Input signals**: `in1`, `in2`
 - **Output signals**: `out1` (single input hash), `out2` (two input hash)
-- **Components**: 
+- **Components**:
   - `Poseidon255(1)` for single input hashing
   - `Poseidon255(2)` for two input hashing
 
-#### 2. `test/poseidon-test/`
+#### 2. `poseidon-test/`
 Rust test implementation that:
-- Uses the `poseidon` crate with `Poseidon255` implementation
+- Uses the `soroban-poseidon` crate with BLS12-381 scalar field parameters
 - Takes JSON input with two values: `in1` and `in2`
 - Computes the same hashes as the circuit
 
-#### 3. `test/test_poseidon_input.json`
+#### 3. `test_poseidon_input.json`
 Test input data:
 ```json
 {
-    "in1": "123456789",
-    "in2": "0"
+    "in1": "51576823595707970152643159819788304363803754756066229172775779360774743019614",
+    "in2": "51576823595707970152643159819788304363803754756066229172775779360774743019614"
 }
 ```
 
 ### Running the Poseidon Compatibility Test
 
+Run every command below from the repository root. The shell examples use Bash input redirection.
+
 #### Prerequisites
 - Rust toolchain (cargo)
 - Node.js and npm
 - circom compiler
-- snarkjs
+- snarkjs 0.7.6 (`npm ci --ignore-scripts --prefix circuits/test`)
 
-#### Step 1: Generate Witness from Rust Implementation
+#### Step 1: Compute Hashes with the Rust Implementation
 ```bash
-cd circuits/test
-cat test_poseidon_input.json | cargo run --bin test_poseidon --manifest-path poseidon-test/Cargo.toml
+cargo run --locked --bin test_poseidon --manifest-path circuits/test/poseidon-test/Cargo.toml < circuits/test/test_poseidon_input.json
 ```
 
 **Expected Output:**
 ```
-49771379518533783451081444171936304251693849153677701053778138403868110038125
-2595333311380081774082696984545715941782212075692277571540746075566179600420
+23949694927245629364409973542171811196735943625447189117637854868491068555458
+33646187916922823865935622258451714952164674255482660942215703235411158105736
 ```
 
 #### Step 2: Generate Witness from Circom Circuit
 ```bash
-cd circuits/test
-circom test_poseidon.circom -l $CIRCOMLIB --prime bls12381 --wasm -o ../build
-node ../build/test_poseidon_js/generate_witness.js ../build/test_poseidon_js/test_poseidon.wasm test_poseidon_input.json test_poseidon_new.wtns
+mkdir -p circuits/build
+circom circuits/test/test_poseidon.circom --prime bls12381 --r1cs --wasm --sym -o circuits/build
+node circuits/build/test_poseidon_js/generate_witness.js circuits/build/test_poseidon_js/test_poseidon.wasm circuits/test/test_poseidon_input.json circuits/build/test_poseidon.wtns
 ```
 
-#### Step 3: Extract Witness Outputs
+#### Step 3: Check the Witness and Extract Outputs
 ```bash
-cd ../../test
-snarkjs wtns export json test_poseidon_new.wtns test_poseidon_new.wtns.json
+node circuits/test/node_modules/snarkjs/build/cli.cjs wtns check circuits/build/test_poseidon.r1cs circuits/build/test_poseidon.wtns
+node circuits/test/node_modules/snarkjs/build/cli.cjs wtns export json circuits/build/test_poseidon.wtns circuits/build/test_poseidon.wtns.json
+node -e "const w = require('./circuits/build/test_poseidon.wtns.json'); console.log(w[1]); console.log(w[2]);"
 ```
 
 #### Step 4: Verify Compatibility
-Compare the outputs from both implementations:
+The symbol file maps `main.out1` to witness index 1 and `main.out2` to index 2. Compare these printed values with the two Rust outputs:
 
 | Hash Type | Rust Output | Circom Output | Status |
 |-----------|-------------|---------------|---------|
-| Single Input (`in1`) | `49771379518533783451081444171936304251693849153677701053778138403868110038125` | `49771379518533783451081444171936304251693849153677701053778138403868110038125` | ✅ **MATCH** |
-| Two Inputs (`in1`, `in2`) | `2595333311380081774082696984545715941782212075692277571540746075566179600420` | `2595333311380081774082696984545715941782212075692277571540746075566179600420` | ✅ **MATCH** |
+| Single Input (`in1`) | `23949694927245629364409973542171811196735943625447189117637854868491068555458` | `23949694927245629364409973542171811196735943625447189117637854868491068555458` | ✅ **MATCH** |
+| Two Inputs (`in1`, `in2`) | `33646187916922823865935622258451714952164674255482660942215703235411158105736` | `33646187916922823865935622258451714952164674255482660942215703235411158105736` | ✅ **MATCH** |
 
 ### Test Circuit Structure
 
@@ -203,8 +205,10 @@ The `test_poseidon.circom` circuit:
 
 - **Field**: Both implementations use the BLS12-381 scalar field
 - **Hash Function**: Poseidon255 with identical constants and parameters
-- **Input Processing**: Both handle the same input format and validation
+- **Input Processing**: This example uses canonical decimal strings; it does not check arbitrary JSON-number conversions or invalid-input policies
 - **Output Format**: Both produce field elements in the same representation
+
+Prototype limit: this helper prints hashes for one manual sample and does not assert equality automatically. It covers one- and two-input hashing; the automated vector suite also covers three inputs and complete commitment derivations.
 
 ### Troubleshooting Poseidon Tests
 
@@ -217,3 +221,48 @@ The `test_poseidon.circom` circuit:
 - Use the generated witness files to verify outputs manually
 - Check that both implementations use the same field arithmetic
 - Verify Poseidon constants are identical between implementations
+
+## Poseidon Parity Vectors
+
+The checked-in fixture at `cli/coinutils/tests/fixtures/poseidon_vectors.json` contains 69 Circom-derived reference outputs. Rust tests call the production `coinutils::poseidon_hash` and `coinutils::generate_commitment` functions; expected outputs never come from Rust.
+
+### Coverage and boundaries
+
+- **Direct hashes:** 15 input triples, each hashed at arities 1, 2, and 3 (`t = arity + 1`), for 45 comparisons against `Poseidon255`.
+- **Project derivations:** 12 fixed `(value, label, nullifier, secret)` tuples, yielding 12 commitments and 12 nullifier hashes from the existing `test_commitment.circom` / `CommitmentHasher` circuit. These exercise `Poseidon(value, label, Poseidon(nullifier, secret))` and `Poseidon(nullifier)`, including argument-order changes.
+- **Inputs:** zero, one, distinct/reordered values, zero in each hash position, the BLS12-381 scalar modulus minus one, mixed zero/maximum values, values around 2^32, 2^64, and 2^128, and values with bit 254 set.
+- All fixture numbers are decimal **strings**, preserving exact integers. Inputs are canonical field elements in `[0, r)`, where `r` is recorded in the fixture. The Rust fixture adapter rejects out-of-range values rather than relying on reduction.
+
+The boundaries start at field elements. Production wrapper conversions and commitment composition are covered. CLI decimal parsing, scope/nonce byte preprocessing, Merkle-tree behavior, receipt-tag derivations, proof generation, and on-chain deposit/withdrawal execution are outside these tests.
+
+### Run the Rust tests
+
+No Circom or Node installation is needed to consume the checked-in fixture:
+
+```sh
+cargo test --locked -p coinutils --test poseidon_parity
+```
+
+A mismatch fails the test and reports the vector ID, derivation, and hash arity where applicable. Run `cargo test --locked -p coinutils` for the package suite.
+
+### Regenerate or check the Circom reference
+
+Use Circom **2.2.2**, Node.js **24**, and the locked snarkjs **0.7.6** dependency:
+
+```sh
+npm ci --ignore-scripts --prefix circuits/test
+node scripts/generate-poseidon-vectors.cjs --check
+node scripts/generate-poseidon-vectors.cjs
+```
+
+`--check` regenerates the reference and exits nonzero on any difference without rewriting the committed fixture. The command without `--check` replaces it; review the resulting diff before accepting changed outputs. Set `CIRCOM_BIN` when the compiler is not named `circom` on PATH.
+
+The generator compiles the repository's actual circuits with `--prime bls12381 --O1 --r1cs --wasm --sym`, calculates witnesses, checks every witness against the R1CS constraints, and reads named outputs through the compiler's symbol files. It records source SHA-256 digests after normalizing CRLF to LF. No timestamps or machine-specific paths enter the fixture. Both Rust verification and fresh Circom regeneration run in `circuits-ci`.
+
+To reproduce the eight deliberate mismatch checks, run `node scripts/check-poseidon-mismatches.cjs` with the same toolchain. It temporarily changes the fixture or Rust source, requires each mismatch to fail, restores the original bytes, and reruns the unmodified parity tests. Run it without concurrent edits to those files. CI runs this check after the package suite.
+
+The older `test_poseidon.circom` and `poseidon-test` binary remain manual one-/two-input comparison tools; they are not used to generate these vectors.
+
+Prototype limit: a finite set of matching vectors is regression evidence, not an exhaustive equivalence proof, a cryptographic audit, or a statement about trusted-setup quality. All inputs are public, synthetic examples.
+
+See [the test results report](../../docs/poseidon-parity-test-report.md) for measured results, mismatch experiments, and remaining coverage limits.

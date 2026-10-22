@@ -5,6 +5,9 @@ on:
     branches: [main]
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
   build-script-check:
     runs-on: ubuntu-latest
@@ -18,3 +21,32 @@ jobs:
         run: bash scripts/build-circuits.sh --help
       - name: Dry run (no toolchain required)
         run: bash scripts/build-circuits.sh --dry-run --all
+
+  poseidon-parity:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: dtolnay/rust-toolchain@1.90.0
+      - name: Install pinned circuit test dependencies
+        run: npm ci --ignore-scripts --prefix circuits/test
+      - name: Install Circom 2.2.2
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download v2.2.2 --repo iden3/circom --pattern circom-linux-amd64 --dir "$RUNNER_TEMP"
+          chmod +x "$RUNNER_TEMP/circom-linux-amd64"
+      - name: Regenerate and compare Circom vectors
+        env:
+          CIRCOM_BIN: ${{ runner.temp }}/circom-linux-amd64
+        run: node scripts/generate-poseidon-vectors.cjs --check
+      - name: Verify Rust consumers
+        run: cargo test --locked -p coinutils
+      - name: Verify mismatch detection
+        env:
+          CIRCOM_BIN: ${{ runner.temp }}/circom-linux-amd64
+        run: node scripts/check-poseidon-mismatches.cjs

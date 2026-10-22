@@ -29,6 +29,8 @@ async fn test_full_coin_lifecycle() -> Result<()> {
         commitments: vec![generated_coin.coin.commitment.clone()],
         scope: "test_scope".to_string(),
         association_set: None,
+        relayer: None,
+        relayer_fee: None,
     };
 
     let state_file_path = temp_dir.path().join("state.json");
