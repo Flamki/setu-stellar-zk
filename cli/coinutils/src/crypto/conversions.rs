@@ -4,11 +4,13 @@ use soroban_sdk::{crypto::bls12_381::Fr as BlsScalar, BytesN, Env, U256};
 
 /// Convert a decimal string to a BlsScalar
 pub fn decimal_string_to_bls_scalar(env: &Env, decimal_str: &str) -> Result<BlsScalar> {
-    // For now, let's use a simpler approach that works with the existing system
-    // We'll convert the decimal to a u128 first, then to BlsScalar
+    if decimal_str.is_empty() {
+        return Err(CoinUtilsError::InvalidDecimal(decimal_str.to_owned()));
+    }
+
+    // Preserve the full parsed integer when constructing the scalar.
     if let Ok(value) = decimal_str.parse::<u128>() {
-        // Convert u128 to BlsScalar
-        return Ok(BlsScalar::from_u256(U256::from_u32(env, value as u32)));
+        return Ok(BlsScalar::from_u256(U256::from_u128(env, value)));
     }
 
     // For very large numbers, we need to handle them differently
