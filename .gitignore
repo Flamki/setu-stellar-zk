@@ -25,3 +25,17 @@ site/.vercel
 .vscode
 # Agents
 .claude
+
+# Generated circuit / proving / testnet scratch artifacts
+circuits/build/
+circuits/disclosure_build/
+*.r1cs
+*.sym
+*.wtns
+*.zkey
+*.ptau
+*.wasm.tmp
+deployments/*.local.json
+dist/
+*.tar.gz
+*.zip
