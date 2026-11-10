@@ -6,7 +6,7 @@ regulated money transmitter or remittance provider**, and it is **not legal,
 compliance, or financial advice**. Read this document before relying on any Setu
 claim in the product story, README, or landing page.
 
-This document is the counterpart to the product story in the README. The story
+This document is the counterpart to the product story in the README (for concise definitions of every signal and hash term, see [AUDITOR-GLOSSARY.md](./AUDITOR-GLOSSARY.md)). The story
 is about what Setu is *building toward*; this page is about what the code
 actually proves today, and what it does **not** prove.
 
