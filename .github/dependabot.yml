@@ -1,0 +1,28 @@
+version: 2
+updates:
+  - package-ecosystem: "cargo"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    ignore:
+      # Major bumps to soroban-sdk or ark-bls12-381 can alter curve serialization
+      # or host cost budgets and must be coordinated across contract, libs/zk, and cli.
+      - dependency-name: "soroban-sdk"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "ark-bls12-381"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "ark-serialize"
+        update-types: ["version-update:semver-major"]
+
+  - package-ecosystem: "npm"
+    directory: "/site"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 3
