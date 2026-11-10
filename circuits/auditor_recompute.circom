@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Setu Contributors
+// Attribution: Setu-original auditor hash recomputation helper circuit.
 pragma circom 2.2.0;
 
 // Auditor-side recomputation helper (witness-only; no proving, no secrets).

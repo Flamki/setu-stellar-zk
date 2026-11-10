@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Setu Contributors
+// Attribution: Setu-original selective-disclosure circuit layered on ymcrcat/soroban-privacy-pools.
 pragma circom 2.2.0;
 
 // Setu selective-disclosure receipt circuit.

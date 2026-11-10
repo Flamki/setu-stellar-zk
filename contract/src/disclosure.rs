@@ -1,3 +1,7 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Setu Contributors
+// Attribution: Setu-original module layered on the ymcrcat/soroban-privacy-pools fork.
+
 //! Setu — on-chain verification of selective-disclosure receipts.
 //!
 //! Additive feature on top of the privacy pool: a second `#contractimpl_`

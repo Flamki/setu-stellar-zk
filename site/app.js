@@ -1,3 +1,7 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Setu Contributors
+// Attribution: Setu-original testnet remittance & auditor workspace UI (prototype; anchor corridors are stubs).
+
 // Elements mapping
 const toast = document.getElementById("toast");
 const profileName = document.getElementById("profile-name");
