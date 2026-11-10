@@ -483,3 +483,11 @@ Setu additions are active-development code. This is not audited production
 software yet and is not legal, compliance, or financial advice.
 
 Relayer design notes in [Relayer Flow Design](docs/relayer-flow.md) are a proposal only and make no implementation claim.
+
+## Roadmap (Prototype vs Future Work)
+
+Setu separates what is implemented on Stellar testnet today from design-only specifications and future production hardening (full details in [docs/ROADMAP.md](docs/ROADMAP.md)):
+
+- **Implemented on Testnet Today:** 1-XLM fixed-denomination Groth16 privacy pool (`deposit`, `withdraw`, `set_association_root`), on-chain and off-chain selective-disclosure receipt verification (`verify_disclosure`, `set_disclosure_vk`), domain-separated VK commitments (`get_vk_commitment`, `get_disclosure_vk_commitment`), nonce-separated v2 `auditorTag`, and the static demo/auditor workspace (`site/`).
+- **Stubbed or Design-Only Today:** USDC on-ramp and INR off-ramp corridors are illustrative UI stubs (not live SEP-24/SEP-31 anchors), the Groth16 trusted setup is a local single-contributor ceremony (`not production-secure`), and the signer-funded relayer flow ([docs/relayer-withdrawal-design.md](docs/relayer-withdrawal-design.md)) is a design specification only.
+- **Next Hardening Milestones:** Deposit-bound `recipientId`/`purpose` commitments, removing the legacy `associationRoot == 0` circuit branch, implementing the Soroban relayer entrypoint, migrating nullifiers/leaves to scalable persistent storage, and completing a multi-party ceremony and external audit.
