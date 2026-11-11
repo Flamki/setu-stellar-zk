@@ -29,6 +29,7 @@ function fail(message) {
 }
 
 const DOC_REL = "docs/privacy-compliance-limitations.md";
+const EVIDENCE_REL = "docs/SUBMISSION-EVIDENCE.md";
 const README_REL = "README.md";
 const SITE_REL = "site/index.html";
 
@@ -174,6 +175,64 @@ function checkSiteClaimsHonest() {
   }
 }
 
+function checkSubmissionEvidenceDoc() {
+  const evidence = read(EVIDENCE_REL);
+  const readme = read(README_REL);
+  if (!evidence) {
+    fail(`missing file: ${EVIDENCE_REL}`);
+    return;
+  }
+  ok(`file exists: ${EVIDENCE_REL}`);
+
+  if (readme && readme.includes(EVIDENCE_REL)) {
+    ok(`README links ${EVIDENCE_REL}`);
+  } else {
+    fail(`README does not link ${EVIDENCE_REL}`);
+  }
+
+  // Every testnet contract/tx identifier recorded in README must stay in sync
+  // with the submission evidence page so links never drift.
+  if (readme) {
+    const txMatches = readme.match(/stellar\.expert\/explorer\/testnet\/tx\/([0-9a-f]{64})/g) || [];
+    for (const txPath of txMatches) {
+      if (evidence.includes(txPath)) {
+        ok(`evidence doc indexes ${txPath.slice(-16)}`);
+      } else {
+        fail(`evidence doc missing README testnet tx link: ${txPath}`);
+      }
+    }
+    const contractId = "CDXLQFYQJVDXBZDI5QVYRAM5TGPMZQWS424FCQWYVNGSKSSHPU6XXAXT";
+    if (evidence.includes(contractId)) {
+      ok("evidence doc includes deployed testnet contract ID");
+    } else {
+      fail("evidence doc missing deployed testnet contract ID");
+    }
+  }
+
+  // Every relative repository link in docs/SUBMISSION-EVIDENCE.md must resolve.
+  const evidenceDir = path.dirname(path.join(root, EVIDENCE_REL));
+  const linkRegex = /\]\((\.\.?\/[^)#]+)\)/g;
+  let match;
+  while ((match = linkRegex.exec(evidence)) !== null) {
+    const relTarget = match[1];
+    const resolved = path.resolve(evidenceDir, relTarget);
+    if (fs.existsSync(resolved)) {
+      ok(`evidence link resolves: ${relTarget}`);
+    } else {
+      fail(`evidence broken link: ${relTarget}`);
+    }
+  }
+
+  const lower = evidence.toLowerCase();
+  for (const tier of ["live testnet", "local proof", "product mock", "prototype", "not production-secure"]) {
+    if (lower.includes(tier)) {
+      ok(`evidence doc distinguishes/states '${tier}'`);
+    } else {
+      fail(`evidence doc missing required boundary marker '${tier}'`);
+    }
+  }
+}
+
 function main() {
   checkDocExists();
   checkReadmeLinksDoc();
@@ -182,6 +241,7 @@ function main() {
   checkDocConservative();
   checkReadmeHonest();
   checkSiteClaimsHonest();
+  checkSubmissionEvidenceDoc();
 
   if (failures.length > 0) {
     console.error(`\ndocs check failed with ${failures.length} problem(s):`);

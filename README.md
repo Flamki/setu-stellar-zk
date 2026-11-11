@@ -32,6 +32,8 @@ A `.github/CODEOWNERS` file is intentionally omitted until real maintainer handl
 
 ## Live Testnet Deployment
 
+For a single-page reviewer checklist indexing these testnet transactions, proof/fixture outputs, UI screenshot, source files, and live-vs-mock boundaries, see [Submission Evidence](docs/SUBMISSION-EVIDENCE.md).
+
 - Contract: `CDXLQFYQJVDXBZDI5QVYRAM5TGPMZQWS424FCQWYVNGSKSSHPU6XXAXT`
 - Lab link:
   https://lab.stellar.org/r/testnet/contract/CDXLQFYQJVDXBZDI5QVYRAM5TGPMZQWS424FCQWYVNGSKSSHPU6XXAXT
@@ -436,6 +438,8 @@ cli/coinutils/             note generation and witness input generation
 circuits/main.circom       withdrawal proof circuit
 circuits/disclosure.circom selective-disclosure receipt circuit
 docs/vk-commitments.md   VK commitment scheme + how to recompute it
+docs/SUBMISSION-EVIDENCE.md
+                           Reviewer index of testnet txs, proofs, and mock limits
 docs/public-signal-serialization.md
                            Proof/PublicSignals wire format + signal order
 scripts/live_testnet_e2e.ps1
