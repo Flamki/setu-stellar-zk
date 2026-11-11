@@ -29,6 +29,7 @@ function fail(message) {
 }
 
 const DOC_REL = "docs/privacy-compliance-limitations.md";
+const WINDOWS_DOC_REL = "docs/WINDOWS-TROUBLESHOOTING.md";
 const README_REL = "README.md";
 const SITE_REL = "site/index.html";
 
@@ -174,6 +175,60 @@ function checkSiteClaimsHonest() {
   }
 }
 
+function checkWindowsTroubleshootingDoc() {
+  const winDoc = read(WINDOWS_DOC_REL);
+  if (!winDoc) {
+    fail(`missing file: ${WINDOWS_DOC_REL}`);
+    return;
+  }
+  ok(`file exists: ${WINDOWS_DOC_REL}`);
+
+  const readme = read(README_REL);
+  if (readme && readme.includes(WINDOWS_DOC_REL)) {
+    ok(`README links ${WINDOWS_DOC_REL}`);
+  } else {
+    fail(`README does not link ${WINDOWS_DOC_REL}`);
+  }
+
+  for (const topic of [
+    "PowerShell",
+    "npm.cmd",
+    "-Stellar",
+    "-Snarkjs",
+    "CIRCOMLIB",
+    "PSSecurityException",
+    "stellar CLI not found",
+    "snarkjs CLI not found",
+  ]) {
+    if (winDoc.includes(topic)) {
+      ok(`Windows doc covers: ${topic}`);
+    } else {
+      fail(`Windows doc missing required topic: ${topic}`);
+    }
+  }
+
+  const lower = winDoc.toLowerCase();
+  for (const caveat of ["prototype", "testnet", "not production-secure"]) {
+    if (lower.includes(caveat)) {
+      ok(`Windows doc stays conservative: '${caveat}'`);
+    } else {
+      fail(`Windows doc missing prototype caveat: '${caveat}'`);
+    }
+  }
+
+  if (/\r/.test(winDoc)) {
+    fail(`${WINDOWS_DOC_REL} contains raw CR (\\r) characters`);
+  } else {
+    ok(`${WINDOWS_DOC_REL} uses clean LF line endings`);
+  }
+
+  if (/\bS[A-Z2-7]{55}\b/.test(winDoc)) {
+    fail(`${WINDOWS_DOC_REL} appears to contain a Stellar secret key`);
+  } else {
+    ok(`${WINDOWS_DOC_REL} includes no Stellar secret keys`);
+  }
+}
+
 function main() {
   checkDocExists();
   checkReadmeLinksDoc();
@@ -182,6 +237,7 @@ function main() {
   checkDocConservative();
   checkReadmeHonest();
   checkSiteClaimsHonest();
+  checkWindowsTroubleshootingDoc();
 
   if (failures.length > 0) {
     console.error(`\ndocs check failed with ${failures.length} problem(s):`);

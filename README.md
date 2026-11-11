@@ -263,6 +263,12 @@ convenience check, not a hermetic environment validator: it only reads
 version strings from whatever is already on PATH (or already `npm install`ed
 for `snarkjs`/`circomlib`), it doesn't install or sandbox anything.
 
+On Windows or WSL2, see
+[Windows & WSL2 Local Setup Troubleshooting](docs/WINDOWS-TROUBLESHOOTING.md)
+for PowerShell execution-policy workarounds, `npm.cmd`, `stellar` / `snarkjs`
+parent-workspace path resolution in `scripts/live_testnet_e2e.ps1`, and
+`CIRCOMLIB` lookup notes.
+
 ### Regenerate circuit artifacts
 
 One command rebuilds both circuit artifact sets (withdrawal and selective
