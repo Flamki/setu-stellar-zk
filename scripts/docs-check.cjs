@@ -29,6 +29,7 @@ function fail(message) {
 }
 
 const DOC_REL = "docs/privacy-compliance-limitations.md";
+const THREAT_MODEL_REL = "docs/THREAT-MODEL.md";
 const README_REL = "README.md";
 const SITE_REL = "site/index.html";
 
@@ -174,6 +175,55 @@ function checkSiteClaimsHonest() {
   }
 }
 
+function checkThreatModel() {
+  const tm = read(THREAT_MODEL_REL);
+  if (!tm) {
+    fail(`missing file: ${THREAT_MODEL_REL}`);
+    return;
+  }
+  ok(`file exists: ${THREAT_MODEL_REL}`);
+
+  const readme = read(README_REL);
+  if (readme && readme.includes(THREAT_MODEL_REL)) {
+    ok(`README links ${THREAT_MODEL_REL}`);
+  } else {
+    fail(`README does not link ${THREAT_MODEL_REL}`);
+  }
+
+  for (const heading of ["In-Scope Adversaries", "Out-of-Scope Adversaries"]) {
+    if (tm.includes(heading)) {
+      ok(`threat model covers: ${heading}`);
+    } else {
+      fail(`threat model missing section: ${heading}`);
+    }
+  }
+
+  const lower = tm.toLowerCase();
+  for (const topic of [
+    "nullifier replay",
+    "public signal malleability",
+    "trusted setup",
+    "anchors",
+    "relayers",
+    "auditor privacy",
+    "not production-secure",
+    "prover-asserted",
+    "stub",
+  ]) {
+    if (lower.includes(topic)) {
+      ok(`threat model covers topic/caveat: '${topic}'`);
+    } else {
+      fail(`threat model missing topic/caveat: '${topic}'`);
+    }
+  }
+
+  if (/#\d+/.test(tm)) {
+    ok("threat model links known risks to repository issues");
+  } else {
+    fail("threat model does not reference any repository issues (#N)");
+  }
+}
+
 function main() {
   checkDocExists();
   checkReadmeLinksDoc();
@@ -182,6 +232,7 @@ function main() {
   checkDocConservative();
   checkReadmeHonest();
   checkSiteClaimsHonest();
+  checkThreatModel();
 
   if (failures.length > 0) {
     console.error(`\ndocs check failed with ${failures.length} problem(s):`);

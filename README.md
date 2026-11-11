@@ -23,7 +23,9 @@ black-box mixer.
 > does not establish everything the story implies. Read
 > [Privacy & Compliance Limitations](docs/privacy-compliance-limitations.md)
 > for what the proofs prove, what they do not prove, the anchor/off-ramp mock
-> status, and the legal caveats.
+> status, and the legal caveats, and [Threat Model](docs/THREAT-MODEL.md) for
+> the in-scope/out-of-scope adversaries, attack surfaces, and linked hardening
+> issues.
 
 ## Ownership
 
@@ -438,6 +440,7 @@ circuits/disclosure.circom selective-disclosure receipt circuit
 docs/vk-commitments.md   VK commitment scheme + how to recompute it
 docs/public-signal-serialization.md
                            Proof/PublicSignals wire format + signal order
+docs/THREAT-MODEL.md       v1 adversary model, attack surfaces, and risk register
 scripts/live_testnet_e2e.ps1
 site/                      Supabase-authenticated web app
 docs/SITE-DEPLOYMENT.md    Vercel deploy path, env vars, rollback
