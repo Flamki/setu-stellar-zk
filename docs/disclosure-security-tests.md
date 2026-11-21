@@ -6,7 +6,7 @@
 | --- | --- |
 | Primary issue | #23 — reject a changed disclosed amount |
 | Branch | `test/23-tampered-disclosed-value` |
-| Base revision | `733e2da71793d7c63bfb7369e48c569e29cde02d`, with local test additions |
+| Base revision | `733e2da71793d7c63bfb7369e48c569e29cde02d`, with the disclosure regression tests |
 | Execution date | 2026-10-21 UTC |
 | Receipt format | v2: five public signals, including `receiptNonce` (upstream PR #102) |
 | Environment | Windows; Node 24.13.1; Circom 2.2.2; snarkjs 0.7.6; circomlib 2.0.5; Rust 1.90.0 |
@@ -19,6 +19,8 @@
 | Process failure handling | 6 | 0 | 0 |
 
 The disclosure and process cases meet their specified outcomes. A negative case is marked PASS when the expected rejection occurs; this does not mean the tampered input was accepted.
+
+Resubmission verification on 2026-11-21 UTC: all 23 disclosure tests and all six process-failure tests passed again, and `node scripts/docs-check.cjs` passed. The Rust result recorded below is from the original verification and was not rerun for this resubmission.
 
 ## Scope and fixtures
 
@@ -193,7 +195,7 @@ The witness calculator reduces integers modulo the scalar-field modulus `r`, mak
 
 ## Reproduction
 
-From the repository root, with Node.js and Circom on `PATH`:
+From the repository root, with Node.js 24 and Circom 2.2.2 on `PATH`:
 
 ```bash
 npm ci --prefix circuits/test
@@ -205,15 +207,14 @@ Node dependencies are pinned by `circuits/test/package-lock.json`. Disclosure ru
 
 ## Evidence
 
-| Suite | Retained report and output |
+| Suite | Generated report and output |
 | --- | --- |
-| Disclosure | `circuits/build_disc/disclosure-tests/2026-10-21T22-41-48-974Z-YqTWf4/report.json` |
-| Process failures | Per-command JSON records under `circuits/build_disc/process-tests/run-OoiVRk/` |
-| Constraint sensitivity | `circuits/build_disc/disclosure-mutations/run-NpEp3S/report.json` |
+| Disclosure | `report.json` in the directory printed by `test:disclosure`, under `circuits/build_disc/disclosure-tests/` |
+| Process failures | Per-command JSON records in the directory printed by `test:runner`, under `circuits/build_disc/process-tests/` |
 
-The timestamps in evidence-directory names are UTC; the execution date above uses Asia/Shanghai. The upstream `zk` suite was also rerun with `cargo +1.90.0 test --offline --locked -p zk`: 17 passed, 0 failed, exit 0.
+The execution date and timestamps in generated directory names use UTC. The original upstream `zk` suite result was 17 passed, 0 failed, exit 0.
 
-These are local paths from the recorded run, not files published in the repository. Evidence is gitignored and is not included in a fresh clone. Each new disclosure run prints its own evidence directory; the process suite prints its command-record directory. The report includes source hashes, tool versions, command arguments, exit codes, stdout/stderr, and per-case observations. Compiled artifacts, inputs, witnesses, keys, and proofs remain beside it. On GitHub Actions, open the workflow run and download the `disclosure-security-results` artifact; the disclosure CI job uploads it even on failure.
+Each run creates its own output directory; generated evidence is gitignored and is not required in a fresh clone. The report includes source hashes, tool versions, command arguments, exit codes, stdout/stderr, and per-case observations. Compiled artifacts, inputs, witnesses, keys, and proofs remain beside it. On GitHub Actions, open the workflow run and download the `disclosure-security-results` artifact; the disclosure CI job uploads it even on failure.
 
 ## Coverage limits
 
