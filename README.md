@@ -122,7 +122,8 @@ Public signals in snarkjs order (circuit outputs first, then
 - The prover knows a deposited note opening.
 - The note commitment is included in the pool Merkle tree.
 - The nullifier hash is correctly derived.
-- The withdrawn value is consistent with the fixed-denomination note.
+- The withdrawn value is at most the note value (the circuit does not itself
+  pin it to a denomination; the contract does, see below).
 - The note label is included in the current association set root.
 
 The contract additionally checks:
@@ -131,6 +132,18 @@ The contract additionally checks:
 - The Merkle root in the proof matches the current pool root.
 - The nullifier has not already been used.
 - The Groth16 proof verifies under the stored withdrawal VK.
+- The proof's `withdrawnValue` equals the pool denomination set at deployment.
+
+### Denomination
+
+Each pool holds one fixed denomination, in the token's smallest unit, chosen at
+deployment (`--denomination`, default `1000000000`) and readable with
+`get_denomination`. It is a raw base-unit amount, not a currency amount: for a
+7-decimal Stellar asset the default is 100 units, not 1. The CLI must generate
+coins with the same value (`generate --denomination`). Several denominations
+mean several pools, which split the anonymity set; read
+[Denominations](docs/denominations.md) before choosing values. The contract is
+a testnet prototype and this has not been audited.
 
 ### Withdrawal Event
 
@@ -435,6 +448,7 @@ cli/circom2soroban/        snarkjs artifact conversion
 cli/coinutils/             note generation and witness input generation
 circuits/main.circom       withdrawal proof circuit
 circuits/disclosure.circom selective-disclosure receipt circuit
+docs/denominations.md    Per-pool denomination design + privacy-set tradeoffs
 docs/vk-commitments.md   VK commitment scheme + how to recompute it
 docs/public-signal-serialization.md
                            Proof/PublicSignals wire format + signal order
@@ -471,7 +485,9 @@ For Proof / PublicSignals wire bytes and circuit signal ordering, see
   already separates receipts by `receiptNonce`; see the disclosure circuit
   notes for the honest limit — prover-side discipline, not a proof guarantee).
 - Implement the relayer flow described in [Relayer Flow Design](docs/relayer-flow.md) (tracked as follow-up tasks).
-- Support multiple denominations or variable amounts.
+- Variable withdrawal amounts. Fixed denominations are configurable per pool
+  (see [Denominations](docs/denominations.md)), but each denomination is a
+  separate pool with its own anonymity set.
 - Replace local trusted setup with a real ceremony.
 - Integrate real Stellar anchors for SEP-24/SEP-31 production corridors.
 

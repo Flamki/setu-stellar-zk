@@ -161,7 +161,9 @@ impl WithdrawalManager {
         let state_root_decimal = bls_scalar_to_decimal_string(&root_scalar);
 
         Ok(SnarkInput {
-            withdrawn_value: crate::config::COIN_VALUE.to_string(),
+            // The pool pays out exactly its denomination, so the proof must claim
+            // the coin's own value, not a hard-coded amount.
+            withdrawn_value: value_decimal.clone(),
             label: label_decimal,
             value: value_decimal,
             nullifier: nullifier_decimal,

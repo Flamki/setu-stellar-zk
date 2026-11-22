@@ -3,8 +3,8 @@
 extern crate alloc;
 
 use soroban_sdk::{
-    contract, contractimpl, symbol_short, token, vec, Address, Bytes, BytesN, Env, String,
-    Symbol, Vec,
+    contract, contractimpl, symbol_short, token, vec, Address, Bytes, BytesN, Env, String, Symbol,
+    Vec,
 };
 
 use lean_imt::{LeanIMT, TREE_DEPTH_KEY, TREE_LEAVES_KEY, TREE_ROOT_KEY};
@@ -37,6 +37,7 @@ pub const ERROR_INSUFFICIENT_BALANCE: &str = "Insufficient balance";
 pub const ERROR_COIN_OWNERSHIP_PROOF: &str = "Couldn't verify coin ownership proof";
 pub const ERROR_WITHDRAW_SUCCESS: &str = "Withdrawal successful";
 pub const ERROR_ONLY_ADMIN: &str = "Only the admin can set association root";
+pub const ERROR_DENOMINATION_MISMATCH: &str = "Withdrawn value does not match pool denomination";
 pub const SUCCESS_ASSOCIATION_ROOT_SET: &str = "Association root set successfully";
 
 const TREE_DEPTH: u32 = 20;
@@ -55,7 +56,23 @@ const TOKEN_KEY: Symbol = symbol_short!("token");
 const ASSOCIATION_ROOT_KEY: Symbol = symbol_short!("assoc");
 const ADMIN_KEY: Symbol = symbol_short!("admin");
 
-const FIXED_AMOUNT: i128 = 1000000000; // 1 XLM in stroops
+const DENOMINATION_KEY: Symbol = symbol_short!("denom");
+
+/// Default pool denomination, in the smallest unit of the configured token.
+///
+/// Pools deployed before the denomination became a constructor argument hold
+/// no stored value and use this one, so their behaviour is unchanged. It is a
+/// raw base-unit amount, not a currency amount: for a 7-decimal Stellar asset
+/// (the native XLM contract, for example) `1_000_000_000` is 100 units, not 1.
+pub const DEFAULT_DENOMINATION: i128 = 1_000_000_000;
+
+/// The pool denomination as a 32-byte big-endian field element, the encoding
+/// the proof's `withdrawnValue` public signal is compared against.
+fn denomination_scalar_bytes(env: &Env, denomination: i128) -> BytesN<32> {
+    let mut bytes = [0u8; 32];
+    bytes[16..].copy_from_slice(&(denomination as u128).to_be_bytes());
+    BytesN::from_array(env, &bytes)
+}
 
 /// `sha256(domain || vk_bytes)` over the exact bytes held in storage.
 ///
@@ -76,7 +93,37 @@ pub struct PrivacyPoolsContract;
 
 #[contractimpl]
 impl PrivacyPoolsContract {
-    pub fn __constructor(env: &Env, vk_bytes: Bytes, token_address: Address, admin: Address) {
+    /// Creates a pool that accepts and pays out exactly one fixed denomination.
+    ///
+    /// # Arguments
+    ///
+    /// * `vk_bytes` - The withdrawal verification key
+    /// * `token_address` - The token the pool holds
+    /// * `admin` - The address allowed to set the association root
+    /// * `denomination` - The amount, in the token's smallest unit, that every
+    ///   deposit pays in and every withdrawal pays out. It must be positive and
+    ///   is fixed for the life of the pool. Use [`DEFAULT_DENOMINATION`] to keep
+    ///   the original behaviour. Deploying one pool per denomination is how a
+    ///   deployment offers several; each pool is a separate anonymity set (see
+    ///   `docs/denominations.md`).
+    ///
+    /// # Panics
+    ///
+    /// Panics (so the deployment fails) if `denomination` is zero or negative.
+    pub fn __constructor(
+        env: &Env,
+        vk_bytes: Bytes,
+        token_address: Address,
+        admin: Address,
+        denomination: i128,
+    ) {
+        if denomination <= 0 {
+            panic!("Denomination must be positive");
+        }
+        env.storage()
+            .instance()
+            .set(&DENOMINATION_KEY, &denomination);
+
         // Store the admin
         env.storage().instance().set(&ADMIN_KEY, &admin);
 
@@ -131,7 +178,7 @@ impl PrivacyPoolsContract {
 
     /// Deposits funds into the privacy pool and stores a commitment in the merkle tree.
     ///
-    /// This function allows a user to deposit a fixed amount (1 XLM) of the configured token into the privacy pool
+    /// This function allows a user to deposit the pool's fixed denomination of the configured token into the privacy pool
     /// while providing a cryptographic commitment that will be used for zero-knowledge proof
     /// verification during withdrawal.
     ///
@@ -150,7 +197,7 @@ impl PrivacyPoolsContract {
     ///
     /// * Requires authentication from the `from` address
     /// * The commitment is stored in a merkle tree for efficient inclusion proofs
-    /// * Transfers exactly `FIXED_AMOUNT` of the configured token from the depositor to the contract
+    /// * Transfers exactly the pool denomination (`get_denomination`) of the configured token from the depositor to the contract
     ///
     /// # Storage
     ///
@@ -164,7 +211,8 @@ impl PrivacyPoolsContract {
 
         // Create token client and transfer from depositor to contract
         let token_client = token::Client::new(env, &token_address);
-        token_client.transfer(&from, &env.current_contract_address(), &FIXED_AMOUNT);
+        let amount = Self::denomination(env);
+        token_client.transfer(&from, &env.current_contract_address(), &amount);
 
         // Store the commitment in the merkle tree
         let (_, leaf_index) = Self::store_commitment(env, commitment)?;
@@ -174,7 +222,7 @@ impl PrivacyPoolsContract {
 
     /// Withdraws funds from the privacy pool using a zero-knowledge proof.
     ///
-    /// This function allows a user to withdraw a fixed amount (1 XLM) of the configured token from the privacy pool
+    /// This function allows a user to withdraw the pool's fixed denomination of the configured token from the privacy pool
     /// by providing a cryptographic proof that proves ownership of a previously deposited
     /// commitment without revealing which specific commitment it corresponds to.
     ///
@@ -193,13 +241,16 @@ impl PrivacyPoolsContract {
     /// * `["Nullifier already used"]` if the nullifier has been used before
     /// * `["Couldn't verify coin ownership proof"]` if the zero-knowledge proof verification fails
     /// * `["Insufficient balance"]` if the contract doesn't have enough funds
+    /// * `["Withdrawn value does not match pool denomination"]` if the proof's
+    ///   `withdrawnValue` public signal is not exactly the pool denomination
     ///
     /// # Security
     ///
     /// * Requires authentication from the `to` address
     /// * Verifies that the nullifier hasn't been used before (prevents double-spending)
     /// * Validates the zero-knowledge proof using Groth16 verification
-    /// * Transfers exactly `FIXED_AMOUNT` of the configured token from the contract to the recipient
+    /// * Requires the proof's `withdrawnValue` public signal to equal the pool denomination
+    /// * Transfers exactly the pool denomination of the configured token from the contract to the recipient
     ///
     /// # Storage
     ///
@@ -233,7 +284,8 @@ impl PrivacyPoolsContract {
         // Check contract balance before updating state
         let token_client = token::Client::new(env, &token_address);
         let contract_balance = token_client.balance(&env.current_contract_address());
-        if contract_balance < FIXED_AMOUNT {
+        let amount = Self::denomination(env);
+        if contract_balance < amount {
             return vec![env, String::from_str(env, ERROR_INSUFFICIENT_BALANCE)];
         }
 
@@ -254,9 +306,16 @@ impl PrivacyPoolsContract {
 
         // Extract public signals: [nullifierHash, withdrawnValue, stateRoot, associationRoot]
         let nullifier_hash = &pub_signals.pub_signals.get(0).unwrap();
-        let _withdrawn_value = &pub_signals.pub_signals.get(1).unwrap();
+        let withdrawn_value = &pub_signals.pub_signals.get(1).unwrap();
         let proof_root = &pub_signals.pub_signals.get(2).unwrap();
         let proof_association_root = &pub_signals.pub_signals.get(3).unwrap();
+
+        // The proof must claim exactly this pool's denomination. The circuit only
+        // bounds the withdrawn value by the note value, so without this check the
+        // public signal would carry no meaning the contract relies on.
+        if withdrawn_value.to_bytes() != denomination_scalar_bytes(env, amount) {
+            return vec![env, String::from_str(env, ERROR_DENOMINATION_MISMATCH)];
+        }
 
         // Verify association set root matches the proof
         let stored_association_root = Self::get_association_root(env);
@@ -300,14 +359,32 @@ impl PrivacyPoolsContract {
         env.storage().instance().set(&NULL_KEY, &nullifiers);
 
         // Transfer the asset from the contract to the recipient
-        token_client.transfer(&env.current_contract_address(), &to, &FIXED_AMOUNT);
+        token_client.transfer(&env.current_contract_address(), &to, &amount);
 
         // Emit a withdraw event with the nullifier hash as public metadata.
         // Privacy tradeoff: the nullifier is already revealed in the proof public
         // signals and stored in the nullifier set, so this event adds no new linkability.
-        env.events().publish((symbol_short!("withdraw"),), nullifier);
+        env.events()
+            .publish((symbol_short!("withdraw"),), nullifier);
 
         vec![env]
+    }
+
+    /// Gets the pool's fixed denomination, in the smallest unit of the token.
+    ///
+    /// Every deposit pays in exactly this amount and every withdrawal pays out
+    /// exactly this amount. It is set by the constructor and never changes.
+    /// Pools created before the denomination was configurable report
+    /// [`DEFAULT_DENOMINATION`].
+    pub fn get_denomination(env: &Env) -> i128 {
+        Self::denomination(env)
+    }
+
+    fn denomination(env: &Env) -> i128 {
+        env.storage()
+            .instance()
+            .get(&DENOMINATION_KEY)
+            .unwrap_or(DEFAULT_DENOMINATION)
     }
 
     /// Gets the current merkle root of the commitment tree

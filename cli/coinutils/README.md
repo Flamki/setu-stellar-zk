@@ -33,8 +33,15 @@ The application is organized into the following modules:
 ### Generate a Coin
 
 ```bash
-stellar-coinutils generate my_pool_scope coin.json
+stellar-coinutils generate my_pool_scope --output coin.json
+stellar-coinutils generate my_pool_scope --denomination 10000000000
 ```
+
+`--denomination` is the coin value in the pool token's smallest unit (default
+`1000000000`). It must equal the denomination the pool contract was deployed
+with, or the contract rejects the withdrawal. It is a raw base-unit amount, not
+a currency amount: for a 7-decimal Stellar asset the default is 100 units. See
+[Denominations](../../docs/denominations.md).
 
 ### Withdraw a Coin
 

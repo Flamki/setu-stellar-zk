@@ -11,7 +11,11 @@ fn main() {
     let command_handler = CommandHandler::new();
 
     let result = match cli.command {
-        Commands::Generate { scope, output } => command_handler.handle_generate(scope, output),
+        Commands::Generate {
+            scope,
+            output,
+            denomination,
+        } => command_handler.handle_generate(scope, output, denomination),
         Commands::Withdraw {
             coin_file,
             state_file,

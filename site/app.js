@@ -53,7 +53,7 @@ const activities = [
   {
     title: "Private withdrawal completed",
     detail: "Nullifier stored on Stellar testnet",
-    amount: "1,000 XLM",
+    amount: "Pool denomination",
   },
   {
     title: "Disclosure receipt verified",
@@ -775,7 +775,7 @@ function runZKSimulator(event) {
     simConsole.scrollTop = simConsole.scrollHeight;
   };
 
-  simConsole.textContent = `[Setu Core] Initializing witness derivation for ${amount} ${asset}...`;
+  simConsole.textContent = `[Setu Core] Initializing witness derivation for ${amount} ${asset} (demo amount; a real pool pays its fixed denomination)...`;
 
   // Step 1: Commitment Hashing
   setTimeout(() => {
@@ -918,15 +918,16 @@ document.getElementById("send-form").addEventListener("submit", (event) => {
   if (!requireWallet("create a private transfer")) return;
 
   const form = new FormData(event.currentTarget);
-  const amount = Number(form.get("amount") || 1000).toLocaleString("en-US");
-  const asset = form.get("asset") || "XLM";
+  // The pool pays one fixed denomination chosen at deployment, so the UI never
+  // invents an amount. See docs/denominations.md.
+  const amountLabel = "pool denomination";
 
   document.getElementById("proof-pill").textContent = "Generated";
   document.getElementById("withdraw-step").className = "flow-step done";
   document.getElementById("receipt-step").className = "flow-step active";
 
   const withdrawCopy = document.getElementById("withdraw-copy");
-  if (withdrawCopy) withdrawCopy.textContent = `${amount} ${asset} proof package ready`;
+  if (withdrawCopy) withdrawCopy.textContent = `Proof package ready for the ${amountLabel}`;
 
   document.getElementById("proof-json").textContent = JSON.stringify(
     {
@@ -934,7 +935,7 @@ document.getElementById("send-form").addEventListener("submit", (event) => {
       senderWallet: currentWallet.address,
       walletNetwork: currentWallet.network || "unknown",
       recipient: form.get("recipient"),
-      amount: `${amount} ${asset}`,
+      amount: amountLabel,
       purpose: form.get("purpose"),
       withdrawalProof: "verified",
       disclosureReceipt: "available",
@@ -946,7 +947,7 @@ document.getElementById("send-form").addEventListener("submit", (event) => {
   activities.unshift({
     title: "Private transfer generated",
     detail: `${form.get("recipient")} · ${form.get("purpose")}`,
-    amount: `${amount} ${asset}`,
+    amount: amountLabel,
   });
 
   renderActivities();
@@ -969,7 +970,7 @@ document.getElementById("copy-receipt").addEventListener("click", async () => {
     receiptId: "SETU-DISC-001",
     wallet: currentWallet.address,
     network: currentWallet.network || "unknown",
-    amount: "1,000 XLM",
+    amount: "pool denomination",
     purpose: "Family support",
     verifyDisclosure: true,
     tamperCheck: false,

@@ -36,7 +36,7 @@ The contract additionally enforces, independent of the proof:
 - The Merkle `stateRoot` in the proof equals the contract's current pool root.
 - The `nullifierHash` has not been used before (double-spend prevention).
 - The Groth16 proof verifies under the stored withdrawal verification key.
-- The contract transfers exactly the fixed denomination (`FIXED_AMOUNT`).
+- The contract transfers exactly the pool's fixed denomination (`get_denomination`).
 
 ### 2. Selective-disclosure receipt (`circuits/disclosure.circom`, verified in `verify_disclosure`)
 
@@ -79,7 +79,7 @@ withdrawal event with safe public metadata:
 
 - `nullifierHash`: the spent-nullifier hash. This is already revealed by the
   withdrawal proof's public signals, so the event adds no new linkability.
-- `amount`: the fixed withdrawal denomination (`FIXED_AMOUNT`), already public
+- `amount`: the pool's fixed denomination (`get_denomination`), already public
   in the transfer.
 
 This event is emitted ** only ** after the proof verifies, the nullifier is
@@ -155,7 +155,7 @@ Today the withdrawing account signs and submits the transaction that calls
 the pool's `withdraw` entrypoint. The ZK proof hides the note opening and the
 spent leaf, but the Stellar transaction envelope still reveals the source
 account, the fee payer, the timing, and the destination account that receives
-`FIXED_AMOUNT`. That metadata is outside the proof and can be correlated with
+the pool denomination. That metadata is outside the proof and can be correlated with
 off-chain information. The goal of a relayer flow is to remove the
 withdrawing account from the transaction envelope and to decouple fee
 payment from the withdrawal authorization.
@@ -182,7 +182,7 @@ Stellar's existing fee-bump model.
 ### Decisions
 
 - **Recipient address.** The recipient address is passed as a public input
-  to the withdrawal call and is paid `FIXED_AMOUNT`. It is **not** hidden
+  to the withdrawal call and is paid the pool denomination. It is **not** hidden
   from the ledger; the relayer hides the *sender*, not the *recipient*.
   The recipient address must therefore be treated as public metadata in
   any privacy claim. Binding the recipient into the deposit commitment is
@@ -249,7 +249,7 @@ product-story stubs, not live anchor integrations.**
 - The testnet asset is the Stellar **native asset (XLM)** used as a stand-in
   for USDC; there is no USDC, or stablecoin integration on testnet or mainnet.
 - There is no deposit-taker, no beneficiary bank account, and no settlement
-  guarantee. "1,000 XLM" and "INR" figures in the UI are demo data.
+  guarantee. Amounts shown in the UI are illustrative demo data, not the denomination of any deployed pool.
 - `Supabase Auth` is wired for real accounts, but public sign-in only works
   once a live Supabase project and deployment environment variables are
   configured; until then the auth forms stay disabled.

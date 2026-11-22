@@ -3241,3 +3241,10 @@ pre code {
     text-align: center;
   }
 }
+
+.muted {
+  display: block;
+  margin-top: 6px;
+  color: var(--muted, #8a93a6);
+  font-size: 0.8rem;
+}

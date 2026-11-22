@@ -18,6 +18,10 @@ pub enum Commands {
         /// Output file path
         #[arg(short, long, default_value = "coin.json")]
         output: String,
+        /// Coin value in the pool token's smallest unit. Must equal the
+        /// denomination the pool contract was deployed with
+        #[arg(short, long, default_value_t = crate::config::DEFAULT_DENOMINATION)]
+        denomination: i128,
     },
     /// Withdraw a coin
     Withdraw {
@@ -49,12 +53,13 @@ impl Cli {
     /// Print usage information
     pub fn print_usage() {
         println!("Usage:");
-        println!("  coinutils generate [scope] [output_file]  - Generate a new coin");
+        println!("  coinutils generate [scope] [--output <file>] [--denomination <base_units>]  - Generate a new coin");
         println!("  coinutils withdraw <coin_file> <state_file> [association_set_file] [output_file]  - Withdraw a coin");
         println!("  coinutils updateAssociation <association_set_file> <label>  - Add label to association set");
         println!();
         println!("Examples:");
-        println!("  coinutils generate my_pool_scope coin.json");
+        println!("  coinutils generate my_pool_scope --output coin.json");
+        println!("  coinutils generate my_pool_scope --denomination 10000000000  # pool deployed with 10_000_000_000");
         println!("  coinutils withdraw coin.json state.json association.json withdrawal.json");
         println!("  coinutils updateAssociation association.json \"1234567890...\"");
         println!();

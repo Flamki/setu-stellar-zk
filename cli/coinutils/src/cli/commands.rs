@@ -27,14 +27,17 @@ impl CommandHandler {
     }
 
     /// Handle the generate command
-    pub fn handle_generate(&self, scope: String, output: String) -> Result<()> {
-        info!("Generating coin with scope: {}", scope);
+    pub fn handle_generate(&self, scope: String, output: String, denomination: i128) -> Result<()> {
+        info!(
+            "Generating coin with scope: {} and denomination: {}",
+            scope, denomination
+        );
         debug!("Output file: {}", output);
 
         let env = Env::default();
         env.cost_estimate().budget().reset_unlimited();
 
-        let generated_coin = generate_coin(&env, scope.as_bytes());
+        let generated_coin = generate_coin(&env, scope.as_bytes(), denomination)?;
         debug!(
             "Generated coin commitment: {}",
             generated_coin.commitment_hex
