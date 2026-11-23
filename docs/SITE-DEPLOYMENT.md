@@ -115,3 +115,16 @@ checks the site scripts, generates the auth config when it is absent (and cleans
 up a config it generated), resolves the local references in `index.html`, and
 boots `server.cjs` for a request round trip. It is a static and smoke-level
 check, not a browser test suite.
+
+## Release artifacts
+
+Only the static site bundle is published from this directory. Generated files
+are deliberately excluded from release packaging:
+
+- `site/auth-config.js` and `site/.vercel` are git-ignored and regenerated per build.
+- Root-level generated testnet JSON and deployment output are evidence, not
+  deployable site content. Keep them out of the `site/` output directory; if
+  they must stay in the repository, record their location and purpose in the
+  root `README.md` so reviewers can find them.
+- This document describes the site only. It makes no claim about contract
+  artifact contents or their completeness on testnet.
