@@ -7,8 +7,9 @@ pub fn decimal_string_to_bls_scalar(env: &Env, decimal_str: &str) -> Result<BlsS
     // For now, let's use a simpler approach that works with the existing system
     // We'll convert the decimal to a u128 first, then to BlsScalar
     if let Ok(value) = decimal_str.parse::<u128>() {
-        // Convert u128 to BlsScalar
-        return Ok(BlsScalar::from_u256(U256::from_u32(env, value as u32)));
+        // Convert u128 to BlsScalar. Do not narrow to u32: values above
+        // u32::MAX (such as larger pool denominations) would be truncated.
+        return Ok(BlsScalar::from_u256(U256::from_u128(env, value)));
     }
 
     // For very large numbers, we need to handle them differently
@@ -96,6 +97,15 @@ mod tests {
         let scalar = BlsScalar::from_u256(U256::from_u32(&env, 123456789));
         let result = bls_scalar_to_decimal_string(&scalar);
         assert_eq!(result, "123456789");
+    }
+
+    #[test]
+    fn test_decimal_conversion_does_not_truncate_above_u32() {
+        let env = Env::default();
+        for value in [u32::MAX as u128 + 1, 10_000_000_000, u64::MAX as u128] {
+            let scalar = decimal_string_to_bls_scalar(&env, &value.to_string()).unwrap();
+            assert_eq!(bls_scalar_to_decimal_string(&scalar), value.to_string());
+        }
     }
 
     #[test]

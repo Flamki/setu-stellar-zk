@@ -1,6 +1,6 @@
 use crate::{
-    config::COIN_VALUE,
     crypto::{poseidon_hash, random_fr},
+    error::{CoinUtilsError, Result},
     types::{CoinData, GeneratedCoin},
 };
 use rand::{thread_rng, Rng};
@@ -40,11 +40,18 @@ pub fn generate_commitment(
     poseidon_hash(env, &[value, label, precommitment])
 }
 
-/// Generate a complete coin with all necessary components
-pub fn generate_coin(env: &Env, scope: &[u8]) -> GeneratedCoin {
+/// Generate a complete coin with all necessary components.
+///
+/// `denomination` is the coin's value in the pool token's smallest unit. It
+/// must match the denomination of the pool the coin will be deposited into,
+/// because the contract pays out exactly that amount per withdrawal.
+pub fn generate_coin(env: &Env, scope: &[u8], denomination: i128) -> Result<GeneratedCoin> {
     use crate::crypto::conversions::bls_scalar_to_decimal_string;
 
-    let value = BlsScalar::from_u256(U256::from_u32(env, COIN_VALUE as u32));
+    if denomination <= 0 {
+        return Err(CoinUtilsError::InvalidDenomination(denomination));
+    }
+    let value = BlsScalar::from_u256(U256::from_u128(env, denomination as u128));
     let nullifier = random_fr(env);
     let secret = random_fr(env);
     let nonce = thread_rng().gen::<[u8; 32]>();
@@ -71,15 +78,16 @@ pub fn generate_coin(env: &Env, scope: &[u8]) -> GeneratedCoin {
         commitment: commitment_decimal,
     };
 
-    GeneratedCoin {
+    Ok(GeneratedCoin {
         coin: coin_data,
         commitment_hex: format!("0x{}", hex::encode(commitment.to_bytes().to_array())),
-    }
+    })
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::DEFAULT_DENOMINATION;
 
     #[test]
     fn test_generate_label() {
@@ -108,7 +116,8 @@ mod tests {
     fn test_generate_coin() {
         let env = Env::default();
         let scope = b"test_scope";
-        let result = generate_coin(&env, scope);
+        let result = generate_coin(&env, scope, DEFAULT_DENOMINATION).unwrap();
+        assert_eq!(result.coin.value, "1000000000");
 
         // Verify the coin has all required fields
         assert!(!result.coin.value.is_empty());
@@ -117,5 +126,35 @@ mod tests {
         assert!(!result.coin.label.is_empty());
         assert!(!result.coin.commitment.is_empty());
         assert!(result.commitment_hex.starts_with("0x"));
+    }
+
+    #[test]
+    fn test_generate_coin_with_non_default_denomination() {
+        let env = Env::default();
+        // Above u32::MAX, where an earlier `as u32` cast silently truncated.
+        for denomination in [2_000_000_000_i128, 10_000_000_000, 123_456_789_012_345] {
+            let result = generate_coin(&env, b"test_scope", denomination).unwrap();
+            assert_eq!(result.coin.value, denomination.to_string());
+        }
+    }
+
+    #[test]
+    fn test_commitment_binds_the_denomination() {
+        let env = Env::default();
+        let a = generate_coin(&env, b"s", 1_000_000_000).unwrap();
+        let b = generate_coin(&env, b"s", 10_000_000_000).unwrap();
+        assert_ne!(a.coin.value, b.coin.value);
+        assert_ne!(a.coin.commitment, b.coin.commitment);
+    }
+
+    #[test]
+    fn test_generate_coin_rejects_non_positive_denomination() {
+        let env = Env::default();
+        for denomination in [0_i128, -1, i128::MIN] {
+            assert!(matches!(
+                generate_coin(&env, b"s", denomination),
+                Err(CoinUtilsError::InvalidDenomination(d)) if d == denomination
+            ));
+        }
     }
 }

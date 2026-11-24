@@ -30,8 +30,8 @@ A deployed relayer would move the following metadata out of the public transacti
 
 A deployed relayer does **not** solve the following. These are the limits that must be stated honestly in the product story and in the compliance document.
 
-1. **The recipient address is still public.** The contract transfers `FIXED_AMOUNT` to a specific address. That address is visible on chain. A relayer hides *who paid the fee**, not *who received the funds**.
-2. **The amount is still public.** The contract only supports one fixed denomination. A linked sequence of withdrawals to the same recipient is visible as a sequence of equal-size transfers.
+1. **The recipient address is still public.** The contract transfers the pool denomination to a specific address. That address is visible on chain. A relayer hides *who paid the fee**, not *who received the funds**.
+2. **The amount is still public.** Each pool supports one fixed denomination (see [Denominations](denominations.md)). A linked sequence of withdrawals to the same recipient is visible as a sequence of equal-size transfers.
 3. **The nullifier hash is still public.** The withdrawal proof's public signals include `nullifierHash`, and the contract stores it in the used-nullifier list. The relayer does not hide this.
 4. **The relayer itself is a trust and metadata center.** The relayer sees the recipient address, the proof, and the timing before submission. It can censor, delay, or correlate withdrawals. A single relayer is a single point of metadata leakage.
 5. **Network-level correlation remains.** If the recipient connects to the relayer from an IP address that is also used for other identifying activity, the relayer can link the withdrawal to that IP. This is outside the scope of the contract and the proof.
@@ -85,7 +85,7 @@ For the next iteration, implement **Option C** first because it requires no cont
 
 ### Recipient Address
 
-The recipient address is a constructor parameter of the withdrawal transaction. It is not part of the ZK proof's public signals. The contract transfers `FIXED_AMOUNT` to whatever address the caller passes as `to`.
+The recipient address is a constructor parameter of the withdrawal transaction. It is not part of the ZK proof's public signals. The contract transfers the pool denomination to whatever address the caller passes as `to`.
 
 In a relayer flow, the recipient address is chosen by the recipient and communicated to the relayer out of band. The relayer includes it in the transaction. The recipient address is still public on chain.
 

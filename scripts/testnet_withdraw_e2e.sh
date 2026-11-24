@@ -5,6 +5,9 @@ NETWORK="${NETWORK:-testnet}"
 SOURCE="${SOURCE:-setu_operator}"
 SCOPE="${SCOPE:-setu_pool}"
 TOKEN_ADDRESS="${TOKEN_ADDRESS:-CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC}"
+# Pool denomination in the token's smallest unit. The deployed pool and the
+# generated coin must use the same value (see docs/denominations.md).
+DENOMINATION="${DENOMINATION:-1000000000}"
 
 # Artifacts are written to an evidence directory (gitignored) instead of the repo root.
 EVIDENCE_DIR="${EVIDENCE_DIR:-evidence/local}"
@@ -58,7 +61,8 @@ DEPLOY_OUTPUT="$(stellar contract deploy \
   -- \
   --vk_bytes "$VK_HEX" \
   --token_address "$TOKEN_ADDRESS" \
-  --admin "$SOURCE" 2>&1)"
+  --admin "$SOURCE" \
+  --denomination "$DENOMINATION" 2>&1)"
 
 CONTRACT_ID="$(echo "$DEPLOY_OUTPUT" | grep -oE 'C[A-Z0-9]{55}' | tail -1)"
 if [ -z "$CONTRACT_ID" ]; then
@@ -71,7 +75,7 @@ echo "Contract deployed: $CONTRACT_ID"
 stellar contract invoke --id "$CONTRACT_ID" --source "$SOURCE" --network "$NETWORK" -- get_admin
 
 echo "Generating note commitment..."
-cargo run --bin stellar-coinutils generate "$SCOPE" -o "$COIN_FILE"
+cargo run --bin stellar-coinutils generate "$SCOPE" -o "$COIN_FILE" --denomination "$DENOMINATION"
 COMMITMENT_HEX="$(jq -r '.commitment_hex' "$COIN_FILE" | sed 's/^0x//')"
 if [ -z "$COMMITMENT_HEX" ] || [ "$COMMITMENT_HEX" = "null" ]; then
   echo "Error: failed to extract commitment hex."

@@ -116,6 +116,7 @@
                       <option>XLM</option>
                     </select>
                   </div>
+                  <small class="muted">Illustrative only. A real pool pays one fixed denomination chosen at deployment, not an arbitrary amount.</small>
                 </div>
                 <div class="form-group">
                   <label for="sim-recipient">Recipient Identifier</label>
@@ -649,9 +650,9 @@
 
           <div class="metrics-row" aria-label="Account summary">
             <article class="panel metric-card">
-              <span>Pool liquidity</span>
-              <strong>1,000 XLM</strong>
-              <small>Fresh testnet deposit confirmed</small>
+              <span>Pool denomination</span>
+              <strong>Fixed per pool</strong>
+              <small>Set at deployment; this demo shows no real amount</small>
             </article>
             <article class="panel metric-card">
               <span>Proof status</span>
@@ -697,7 +698,7 @@
                 </div>
                 <div>
                   <span>Amount</span>
-                  <strong>1,000 XLM</strong>
+                  <strong>Pool denomination</strong>
                 </div>
                 <div>
                   <span>Receipt</span>
@@ -740,13 +741,8 @@
               </div>
               <div class="form-group">
                 <label for="send-amount">Amount</label>
-                <div class="amount-row">
-                  <input id="send-amount" name="amount" type="number" min="1" value="1000" />
-                  <select name="asset" aria-label="Asset choice">
-                    <option>XLM</option>
-                    <option>USDC</option>
-                  </select>
-                </div>
+                <input id="send-amount" name="amount" value="Pool denomination (fixed at deployment)" readonly />
+                <small class="muted">Each pool pays one fixed amount in its token's smallest unit. Use several pools for several amounts.</small>
               </div>
               <div class="form-group">
                 <label for="send-purpose">Purpose</label>
@@ -835,7 +831,7 @@
                 </div>
                 <div>
                   <span>Asset</span>
-                  <strong>1,000 XLM</strong>
+                  <strong>Pool token</strong>
                 </div>
                 <div>
                   <span>Destination</span>
@@ -886,7 +882,7 @@
                 <dl>
                   <div>
                     <dt>Disclosed amount</dt>
-                    <dd>1,000 XLM</dd>
+                    <dd>Pool denomination</dd>
                   </div>
                   <div>
                     <dt>Purpose</dt>

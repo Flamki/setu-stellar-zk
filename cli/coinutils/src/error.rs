@@ -32,6 +32,9 @@ pub enum CoinUtilsError {
     #[error("Invalid decimal character: {0}")]
     InvalidDecimalCharacter(char),
 
+    #[error("Invalid denomination {0}: it must be greater than zero")]
+    InvalidDenomination(i128),
+
     #[error("LeanIMT error: {0}")]
     LeanIMT(String),
 }

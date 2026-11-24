@@ -3,6 +3,8 @@ param(
     [string]$Source = "setu_operator",
     [string]$Network = "testnet",
     [string]$TokenAddress = "CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC",
+    # Pool denomination in the token's smallest unit; the pool and coin must match.
+    [string]$Denomination = "1000000000",
     [string]$Stellar = "",
     [string]$Snarkjs = ""
 )
@@ -77,7 +79,8 @@ if (-not $ContractId) {
         -- `
         --vk_bytes $vkHex `
         --token_address $TokenAddress `
-        --admin $Source 2>&1
+        --admin $Source `
+        --denomination $Denomination 2>&1
 
     $deployText = $deployOut -join "`n"
     $deployText | Set-Content -LiteralPath deploy_output.txt
@@ -88,7 +91,7 @@ if (-not $ContractId) {
 
 Write-Host "Contract: $ContractId"
 
-cargo run -q --bin stellar-coinutils generate setu_pool -o testnet_coin.json
+cargo run -q --bin stellar-coinutils generate setu_pool -o testnet_coin.json --denomination $Denomination
 $coinFile = Get-Content -Raw -LiteralPath testnet_coin.json | ConvertFrom-Json
 $commitmentHex = $coinFile.commitment_hex -replace '^0x', ''
 

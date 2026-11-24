@@ -1,5 +1,6 @@
 use coinutils::{
     cli::CommandHandler,
+    config::DEFAULT_DENOMINATION,
     crypto::coin::generate_coin,
     error::Result,
     io::FileManager,
@@ -19,7 +20,7 @@ async fn test_full_coin_lifecycle() -> Result<()> {
 
     // Step 1: Generate a coin
     let scope = b"test_scope";
-    let generated_coin = generate_coin(&env, scope);
+    let generated_coin = generate_coin(&env, scope, DEFAULT_DENOMINATION)?;
 
     let coin_file = temp_dir.path().join("coin.json");
     file_manager.write_coin_file(&generated_coin, coin_file.to_str().unwrap())?;
@@ -29,6 +30,8 @@ async fn test_full_coin_lifecycle() -> Result<()> {
         commitments: vec![generated_coin.coin.commitment.clone()],
         scope: "test_scope".to_string(),
         association_set: None,
+        relayer: None,
+        relayer_fee: None,
     };
 
     let state_file_path = temp_dir.path().join("state.json");
@@ -106,6 +109,7 @@ async fn test_coin_generation() -> Result<()> {
     command_handler.handle_generate(
         "test_scope".to_string(),
         output_file.to_str().unwrap().to_string(),
+        DEFAULT_DENOMINATION,
     )?;
 
     // Verify the coin file was created
@@ -123,4 +127,69 @@ async fn test_coin_generation() -> Result<()> {
     assert!(coin.commitment_hex.starts_with("0x"));
 
     Ok(())
+}
+
+#[tokio::test]
+async fn test_non_default_denomination_lifecycle() -> Result<()> {
+    // Above u32::MAX, so any narrowing of the coin value would corrupt it.
+    const DENOMINATION: i128 = 10_000_000_000;
+
+    let temp_dir = TempDir::new().unwrap();
+    let env = Env::default();
+    env.cost_estimate().budget().reset_unlimited();
+
+    let command_handler = CommandHandler::new();
+    let file_manager = FileManager::new();
+    let coin_file = temp_dir.path().join("coin.json");
+    let state_file = temp_dir.path().join("state.json");
+    let withdrawal_file = temp_dir.path().join("withdrawal.json");
+
+    command_handler.handle_generate(
+        "test_scope".to_string(),
+        coin_file.to_str().unwrap().to_string(),
+        DENOMINATION,
+    )?;
+    let generated = file_manager.read_coin_file(coin_file.to_str().unwrap())?;
+    assert_eq!(generated.coin.value, DENOMINATION.to_string());
+
+    let state = StateFile {
+        commitments: vec![generated.coin.commitment.clone()],
+        scope: "test_scope".to_string(),
+        association_set: None,
+        relayer: None,
+        relayer_fee: None,
+    };
+    file_manager.write_state_file(&state, state_file.to_str().unwrap())?;
+
+    command_handler.handle_withdraw(
+        coin_file.to_str().unwrap().to_string(),
+        state_file.to_str().unwrap().to_string(),
+        None,
+        withdrawal_file.to_str().unwrap().to_string(),
+    )?;
+
+    // The proof input must claim the coin's own value, not the default amount.
+    let input: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(&withdrawal_file)?)?;
+    assert_eq!(input["withdrawnValue"], DENOMINATION.to_string());
+    assert_eq!(input["value"], DENOMINATION.to_string());
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_generate_rejects_non_positive_denomination() {
+    let temp_dir = TempDir::new().unwrap();
+    let out = temp_dir.path().join("coin.json");
+    let command_handler = CommandHandler::new();
+
+    for denomination in [0, -1] {
+        let result = command_handler.handle_generate(
+            "test_scope".to_string(),
+            out.to_str().unwrap().to_string(),
+            denomination,
+        );
+        assert!(result.is_err());
+    }
+    assert!(!out.exists());
 }

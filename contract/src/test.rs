@@ -319,6 +319,17 @@ fn init_erronous_pub_signals(env: &Env) -> Bytes {
 }
 
 fn setup_test_environment(env: &Env) -> (Address, Address, Address) {
+    setup_pool(env, init_vk(env), DEFAULT_DENOMINATION)
+}
+
+fn setup_test_environment_with_denomination(
+    env: &Env,
+    denomination: i128,
+) -> (Address, Address, Address) {
+    setup_pool(env, init_vk(env), denomination)
+}
+
+fn setup_pool(env: &Env, vk: Bytes, denomination: i128) -> (Address, Address, Address) {
     // Deploy mock token
     let token_admin = Address::generate(env);
     let token_id = env.register(MockToken, ());
@@ -336,7 +347,7 @@ fn setup_test_environment(env: &Env) -> (Address, Address, Address) {
     let admin = Address::generate(env);
     let privacy_pools_id = env.register(
         PrivacyPoolsContract,
-        (init_vk(env), token_id.clone(), admin.clone()),
+        (vk, token_id.clone(), admin.clone(), denomination),
     );
 
     (token_id, privacy_pools_id, admin)
@@ -1238,6 +1249,7 @@ fn test_vk_commitment_changes_with_the_installed_key() {
             Bytes::from_slice(&env, b"a-different-verification-key"),
             token_id,
             admin,
+            DEFAULT_DENOMINATION,
         ),
     );
     let other = PrivacyPoolsContractClient::new(&env, &other_id);
@@ -1292,4 +1304,397 @@ fn test_set_disclosure_vk_emits_exactly_one_event() {
         before + 1,
         "set_disclosure_vk must publish exactly one (\"dvk\", \"set\") commitment event"
     );
+}
+
+// ---------------------------------------------------------------------------
+// Configurable fixed denominations (issue #17)
+//
+// The checked-in circom fixtures prove a withdrawal of exactly 1_000_000_000,
+// the default denomination. To exercise a pool with a *different* denomination
+// through the real Groth16 verifier, `denomination_tests` builds a genuine
+// proof with ark-groth16 over a tiny test-only circuit that exposes the same
+// four public signals as the withdrawal circuit. It tests the contract's
+// denomination, nullifier, state-root and association-root handling; it does
+// not exercise the Circom circuit, whose statement is unchanged.
+// ---------------------------------------------------------------------------
+mod denomination_tests {
+    use super::*;
+    use ark_bls12_381::{Bls12_381, Fr as ArkFr};
+    use ark_ff::PrimeField;
+    use ark_groth16::{Groth16, ProvingKey};
+    use ark_relations::r1cs::{ConstraintSynthesizer, ConstraintSystemRef, SynthesisError};
+    use ark_snark::{CircuitSpecificSetupSNARK, SNARK};
+    use ark_std::rand::{rngs::StdRng, SeedableRng};
+
+    /// Above `u32::MAX` base units, the range an earlier CLI cast silently truncated.
+    const LARGE_DENOMINATION: i128 = 10_000_000_000;
+    const SMALL_DENOMINATION: i128 = 2_000_000_000;
+
+    /// Four public inputs and nothing else:
+    /// `[nullifierHash, withdrawnValue, stateRoot, associationRoot]`.
+    struct FourPublicSignals([Option<ArkFr>; 4]);
+
+    impl ConstraintSynthesizer<ArkFr> for FourPublicSignals {
+        fn generate_constraints(
+            self,
+            cs: ConstraintSystemRef<ArkFr>,
+        ) -> Result<(), SynthesisError> {
+            for value in self.0 {
+                cs.new_input_variable(|| value.ok_or(SynthesisError::AssignmentMissing))?;
+            }
+            Ok(())
+        }
+    }
+
+    fn soroban_g1(env: &Env, point: &ark_bls12_381::G1Affine) -> G1Affine {
+        let mut buf = [0u8; G1_SERIALIZED_SIZE];
+        point.serialize_uncompressed(&mut buf[..]).unwrap();
+        G1Affine::from_array(env, &buf)
+    }
+
+    fn soroban_g2(env: &Env, point: &ark_bls12_381::G2Affine) -> G2Affine {
+        let mut buf = [0u8; G2_SERIALIZED_SIZE];
+        point.serialize_uncompressed(&mut buf[..]).unwrap();
+        G2Affine::from_array(env, &buf)
+    }
+
+    /// A key pair for the test circuit, and the verification key in the
+    /// encoding the contract stores.
+    fn test_keys(env: &Env) -> (ProvingKey<Bls12_381>, Bytes) {
+        let mut rng = StdRng::seed_from_u64(17);
+        let (pk, vk) = Groth16::<Bls12_381>::setup(FourPublicSignals([None; 4]), &mut rng).unwrap();
+        let mut ic: Vec<G1Affine> = Vec::new(env);
+        for p in vk.gamma_abc_g1.iter() {
+            ic.push_back(soroban_g1(env, p));
+        }
+        let vk_bytes = VerificationKey {
+            alpha: soroban_g1(env, &vk.alpha_g1),
+            beta: soroban_g2(env, &vk.beta_g2),
+            gamma: soroban_g2(env, &vk.gamma_g2),
+            delta: soroban_g2(env, &vk.delta_g2),
+            ic,
+        }
+        .to_bytes(env);
+        (pk, vk_bytes)
+    }
+
+    fn scalar_bytes(value: u128) -> BytesN<32> {
+        let mut bytes = [0u8; 32];
+        bytes[16..].copy_from_slice(&value.to_be_bytes());
+        BytesN::from_array(&Env::default(), &bytes)
+    }
+
+    /// Proof and public-signal bytes for the four signals, as the contract takes them.
+    fn prove(env: &Env, pk: &ProvingKey<Bls12_381>, signals: [BytesN<32>; 4]) -> (Bytes, Bytes) {
+        let values = signals
+            .clone()
+            .map(|s| ArkFr::from_be_bytes_mod_order(&s.to_array()));
+        let mut rng = StdRng::seed_from_u64(99);
+        let proof =
+            Groth16::<Bls12_381>::prove(pk, FourPublicSignals(values.map(Some)), &mut rng).unwrap();
+        let proof_bytes = Proof {
+            a: soroban_g1(env, &proof.a),
+            b: soroban_g2(env, &proof.b),
+            c: soroban_g1(env, &proof.c),
+        }
+        .to_bytes(env);
+        let signals_bytes = PublicSignals {
+            pub_signals: Vec::from_array(
+                env,
+                signals.map(|s| Fr::from_bytes(BytesN::from_array(env, &s.to_array()))),
+            ),
+        }
+        .to_bytes(env);
+        (proof_bytes, signals_bytes)
+    }
+
+    fn commitment(env: &Env, tag: u8) -> BytesN<32> {
+        let mut bytes = [0u8; 32];
+        bytes[31] = tag;
+        BytesN::from_array(env, &bytes)
+    }
+
+    fn association_root(env: &Env) -> BytesN<32> {
+        let mut bytes = [0u8; 32];
+        bytes[0] = 0x01;
+        bytes[31] = 0x07;
+        BytesN::from_array(env, &bytes)
+    }
+
+    fn nullifier(env: &Env, tag: u8) -> BytesN<32> {
+        let mut bytes = [0u8; 32];
+        bytes[30] = 0x0a;
+        bytes[31] = tag;
+        BytesN::from_array(env, &bytes)
+    }
+
+    #[test]
+    fn default_denomination_is_one_billion_base_units() {
+        let env = Env::default();
+        let (_token, contract_id, _admin) = setup_test_environment(&env);
+        let client = PrivacyPoolsContractClient::new(&env, &contract_id);
+
+        assert_eq!(DEFAULT_DENOMINATION, 1_000_000_000);
+        assert_eq!(client.get_denomination(), 1_000_000_000);
+    }
+
+    #[test]
+    fn constructor_stores_the_configured_denomination() {
+        let env = Env::default();
+        for denomination in [1, SMALL_DENOMINATION, LARGE_DENOMINATION, i128::MAX] {
+            let (_token, contract_id, _admin) =
+                setup_test_environment_with_denomination(&env, denomination);
+            let client = PrivacyPoolsContractClient::new(&env, &contract_id);
+            assert_eq!(client.get_denomination(), denomination);
+        }
+    }
+
+    #[test]
+    #[should_panic(expected = "Denomination must be positive")]
+    fn constructor_rejects_a_zero_denomination() {
+        let env = Env::default();
+        setup_test_environment_with_denomination(&env, 0);
+    }
+
+    #[test]
+    #[should_panic(expected = "Denomination must be positive")]
+    fn constructor_rejects_a_negative_denomination() {
+        let env = Env::default();
+        setup_test_environment_with_denomination(&env, -1_000_000_000);
+    }
+
+    #[test]
+    fn a_pool_created_before_denominations_were_configurable_uses_the_default() {
+        let env = Env::default();
+        let (token_id, contract_id, _admin) =
+            setup_test_environment_with_denomination(&env, LARGE_DENOMINATION);
+        let client = PrivacyPoolsContractClient::new(&env, &contract_id);
+        let token_client = MockTokenClient::new(&env, &token_id);
+
+        // Simulate legacy storage, which has no denomination entry.
+        env.as_contract(&contract_id, || {
+            env.storage().instance().remove(&DENOMINATION_KEY);
+        });
+        assert_eq!(client.get_denomination(), DEFAULT_DENOMINATION);
+
+        let alice = Address::generate(&env);
+        env.mock_all_auths();
+        token_client.mint(&alice, &DEFAULT_DENOMINATION);
+        client.deposit(&alice, &commitment(&env, 1));
+        assert_eq!(token_client.balance(&contract_id), DEFAULT_DENOMINATION);
+    }
+
+    #[test]
+    fn denomination_is_encoded_as_a_big_endian_field_element() {
+        let env = Env::default();
+        // The encoding must match the withdrawn-value signal of the circom fixture.
+        let fixture = PublicSignals::from_bytes(&env, &init_pub_signals(&env)).unwrap();
+        assert_eq!(
+            fixture.pub_signals.get(1).unwrap().to_bytes(),
+            denomination_scalar_bytes(&env, DEFAULT_DENOMINATION)
+        );
+
+        let large = denomination_scalar_bytes(&env, LARGE_DENOMINATION).to_array();
+        assert_eq!(&large[..16], &[0u8; 16]);
+        assert_eq!(&large[27..], &[0x02, 0x54, 0x0b, 0xe4, 0x00]);
+    }
+
+    #[test]
+    fn deposit_moves_exactly_the_configured_denomination() {
+        let env = Env::default();
+        let (token_id, contract_id, _admin) =
+            setup_test_environment_with_denomination(&env, LARGE_DENOMINATION);
+        let client = PrivacyPoolsContractClient::new(&env, &contract_id);
+        let token_client = MockTokenClient::new(&env, &token_id);
+
+        let alice = Address::generate(&env);
+        env.mock_all_auths();
+        token_client.mint(&alice, &(LARGE_DENOMINATION + 5));
+
+        assert_eq!(client.deposit(&alice, &commitment(&env, 1)), 0);
+
+        assert_eq!(token_client.balance(&alice), 5);
+        assert_eq!(token_client.balance(&contract_id), LARGE_DENOMINATION);
+        assert_eq!(client.get_balance(), LARGE_DENOMINATION);
+        assert_eq!(client.get_commitment_count(), 1);
+
+        // The 5 base units left are far below one denomination.
+        assert!(client.try_deposit(&alice, &commitment(&env, 2)).is_err());
+        assert_eq!(client.get_commitment_count(), 1);
+        assert_eq!(token_client.balance(&alice), 5);
+    }
+
+    #[test]
+    fn insufficient_balance_check_uses_the_configured_denomination() {
+        let env = Env::default();
+        let (token_id, contract_id, admin) =
+            setup_test_environment_with_denomination(&env, SMALL_DENOMINATION);
+        let client = PrivacyPoolsContractClient::new(&env, &contract_id);
+        let token_client = MockTokenClient::new(&env, &token_id);
+
+        env.mock_all_auths();
+        client.set_association_root(&admin, &association_root(&env));
+        // One default denomination is enough for a default pool but not for this one.
+        token_client.mint(&contract_id, &DEFAULT_DENOMINATION);
+
+        let bob = Address::generate(&env);
+        let result = client.withdraw(&bob, &init_proof(&env), &init_pub_signals(&env));
+
+        assert_eq!(
+            result,
+            vec![&env, String::from_str(&env, ERROR_INSUFFICIENT_BALANCE)]
+        );
+        assert_eq!(token_client.balance(&bob), 0);
+    }
+
+    #[test]
+    fn a_proof_for_the_default_denomination_is_rejected_by_another_pool() {
+        let env = Env::default();
+        let (token_id, contract_id, admin) =
+            setup_test_environment_with_denomination(&env, SMALL_DENOMINATION);
+        let client = PrivacyPoolsContractClient::new(&env, &contract_id);
+        let token_client = MockTokenClient::new(&env, &token_id);
+
+        // The same deposit and association root the default-pool test uses, so
+        // only the denomination differs.
+        let alice = Address::generate(&env);
+        let bob = Address::generate(&env);
+        env.mock_all_auths();
+        token_client.mint(&alice, &SMALL_DENOMINATION);
+        client.deposit(
+            &alice,
+            &BytesN::from_array(
+                &env,
+                &[
+                    0x10, 0xcb, 0x63, 0x1d, 0x17, 0x4a, 0x98, 0xb2, 0x44, 0x0b, 0x68, 0xd2, 0xe5,
+                    0x7d, 0xa2, 0xae, 0x9a, 0x13, 0xf7, 0xd1, 0xcc, 0xcb, 0x1f, 0x41, 0xa1, 0xdd,
+                    0x3d, 0x69, 0xa2, 0x2f, 0xaa, 0xe9,
+                ],
+            ),
+        );
+        client.set_association_root(
+            &admin,
+            &BytesN::from_array(
+                &env,
+                &[
+                    0x5d, 0x58, 0x26, 0xf9, 0xc9, 0x18, 0x7b, 0xdb, 0x21, 0x3f, 0x01, 0xde, 0xd6,
+                    0xd2, 0x30, 0xe9, 0xf1, 0xab, 0x65, 0x3b, 0x5b, 0xee, 0x60, 0x36, 0x50, 0x4e,
+                    0x82, 0xbc, 0x07, 0x16, 0xba, 0xa2,
+                ],
+            ),
+        );
+
+        let result = client.withdraw(&bob, &init_proof(&env), &init_pub_signals(&env));
+
+        assert_eq!(
+            result,
+            vec![&env, String::from_str(&env, ERROR_DENOMINATION_MISMATCH)]
+        );
+        assert_eq!(token_client.balance(&bob), 0);
+        assert_eq!(token_client.balance(&contract_id), SMALL_DENOMINATION);
+        assert_eq!(client.get_nullifiers().len(), 0);
+    }
+
+    #[test]
+    fn withdraw_pays_the_configured_denomination_when_the_proof_matches() {
+        let env = Env::default();
+        let (pk, vk_bytes) = test_keys(&env);
+        let (token_id, contract_id, admin) = setup_pool(&env, vk_bytes, LARGE_DENOMINATION);
+        let client = PrivacyPoolsContractClient::new(&env, &contract_id);
+        let token_client = MockTokenClient::new(&env, &token_id);
+
+        let alice = Address::generate(&env);
+        let bob = Address::generate(&env);
+        env.mock_all_auths();
+        token_client.mint(&alice, &LARGE_DENOMINATION);
+        client.deposit(&alice, &commitment(&env, 1));
+        client.set_association_root(&admin, &association_root(&env));
+
+        let (proof, signals) = prove(
+            &env,
+            &pk,
+            [
+                nullifier(&env, 1),
+                scalar_bytes(LARGE_DENOMINATION as u128),
+                client.get_merkle_root(),
+                association_root(&env),
+            ],
+        );
+        let result = client.withdraw(&bob, &proof, &signals);
+
+        assert_eq!(result, vec![&env]);
+        assert_eq!(token_client.balance(&bob), LARGE_DENOMINATION);
+        assert_eq!(token_client.balance(&contract_id), 0);
+        assert_eq!(client.get_nullifiers().len(), 1);
+    }
+
+    #[test]
+    fn a_valid_proof_for_a_different_amount_is_rejected_before_any_payout() {
+        let env = Env::default();
+        let (pk, vk_bytes) = test_keys(&env);
+        let (token_id, contract_id, admin) = setup_pool(&env, vk_bytes, LARGE_DENOMINATION);
+        let client = PrivacyPoolsContractClient::new(&env, &contract_id);
+        let token_client = MockTokenClient::new(&env, &token_id);
+
+        let alice = Address::generate(&env);
+        let bob = Address::generate(&env);
+        env.mock_all_auths();
+        token_client.mint(&alice, &LARGE_DENOMINATION);
+        client.deposit(&alice, &commitment(&env, 1));
+        client.set_association_root(&admin, &association_root(&env));
+
+        // Cryptographically valid, but it claims a different amount than the pool pays.
+        for claimed in [
+            DEFAULT_DENOMINATION as u128,
+            (LARGE_DENOMINATION - 1) as u128,
+            (LARGE_DENOMINATION + 1) as u128,
+            0,
+        ] {
+            let (proof, signals) = prove(
+                &env,
+                &pk,
+                [
+                    nullifier(&env, 2),
+                    scalar_bytes(claimed),
+                    client.get_merkle_root(),
+                    association_root(&env),
+                ],
+            );
+            let result = client.withdraw(&bob, &proof, &signals);
+            assert_eq!(
+                result,
+                vec![&env, String::from_str(&env, ERROR_DENOMINATION_MISMATCH)],
+                "claimed amount {claimed} must be rejected"
+            );
+        }
+
+        assert_eq!(token_client.balance(&bob), 0);
+        assert_eq!(token_client.balance(&contract_id), LARGE_DENOMINATION);
+        assert_eq!(client.get_nullifiers().len(), 0);
+    }
+
+    #[test]
+    fn two_denominations_are_two_independent_pools() {
+        let env = Env::default();
+        let (token_a, pool_a, _) =
+            setup_test_environment_with_denomination(&env, SMALL_DENOMINATION);
+        let (token_b, pool_b, _) =
+            setup_test_environment_with_denomination(&env, LARGE_DENOMINATION);
+        let client_a = PrivacyPoolsContractClient::new(&env, &pool_a);
+        let client_b = PrivacyPoolsContractClient::new(&env, &pool_b);
+
+        let alice = Address::generate(&env);
+        env.mock_all_auths();
+        MockTokenClient::new(&env, &token_a).mint(&alice, &SMALL_DENOMINATION);
+        MockTokenClient::new(&env, &token_b).mint(&alice, &LARGE_DENOMINATION);
+        client_a.deposit(&alice, &commitment(&env, 1));
+
+        // Each pool keeps its own tree: a deposit into one is invisible to the other,
+        // which is why splitting across denominations splits the anonymity set.
+        assert_eq!(client_a.get_commitment_count(), 1);
+        assert_eq!(client_b.get_commitment_count(), 0);
+        assert_ne!(client_a.get_merkle_root(), client_b.get_merkle_root());
+        assert_eq!(client_a.get_balance(), SMALL_DENOMINATION);
+        assert_eq!(client_b.get_balance(), 0);
+    }
 }

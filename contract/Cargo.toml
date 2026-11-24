@@ -21,6 +21,12 @@ ark-bls12-381 = { version = "0.4.0" }
 ark-serialize = { version = "0.4.2" }
 ark-ff = { version = "0.4.2" }
 ark-ec = { version = "0.4.2" }
+# Test-only: build a genuine Groth16 proof for a pool denomination the
+# checked-in circom fixtures do not cover (see `denomination_tests` in test.rs).
+ark-groth16 = { version = "0.4.0", default-features = false }
+ark-relations = { version = "0.4.0", default-features = false }
+ark-snark = { version = "0.4.0", default-features = false }
+ark-std = { version = "0.4.0", default-features = false, features = ["std"] }
 hex = { version = "0.4.3" }
 
 [features]
