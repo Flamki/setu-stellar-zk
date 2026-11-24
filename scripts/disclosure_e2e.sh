@@ -5,6 +5,7 @@
 #
 # Requires circom 2.2.x, snarkjs, and circomlib. This generates a local
 # single-contributor Groth16 setup for staging/testing only, not production.
+# Build outputs go to circuits/build_disc (gitignored).
 set -euo pipefail
 
 CIRC=circuits

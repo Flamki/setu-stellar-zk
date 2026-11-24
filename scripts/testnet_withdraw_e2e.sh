@@ -6,16 +6,23 @@ SOURCE="${SOURCE:-setu_operator}"
 SCOPE="${SCOPE:-setu_pool}"
 TOKEN_ADDRESS="${TOKEN_ADDRESS:-CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC}"
 
-COIN_FILE="${COIN_FILE:-testnet_coin.json}"
-STATE_FILE="${STATE_FILE:-testnet_state.json}"
-ASSOCIATION_FILE="${ASSOCIATION_FILE:-testnet_association.json}"
-WITHDRAWAL_FILE="${WITHDRAWAL_FILE:-withdrawal_input.json}"
+# Artifacts are written to an evidence directory (gitignored) instead of the repo root.
+EVIDENCE_DIR="${EVIDENCE_DIR:-evidence/local}"
+mkdir -p "$EVIDENCE_DIR"
+
+COIN_FILE="${COIN_FILE:-$EVIDENCE_DIR/testnet_coin.json}"
+STATE_FILE="${STATE_FILE:-$EVIDENCE_DIR/testnet_state.json}"
+ASSOCIATION_FILE="${ASSOCIATION_FILE:-$EVIDENCE_DIR/testnet_association.json}"
+WITHDRAWAL_FILE="${WITHDRAWAL_FILE:-$EVIDENCE_DIR/withdrawal_input.json}"
+VK_HEX_FILE="$EVIDENCE_DIR/vk_hex.txt"
+PROOF_HEX_FILE="$EVIDENCE_DIR/proof_hex.txt"
+PUBLIC_HEX_FILE="$EVIDENCE_DIR/public_hex.txt"
 
 echo "Starting Setu privacy-pool testnet run..."
 
 echo "Cleaning generated testnet files..."
 rm -f "$COIN_FILE" "$STATE_FILE" "$ASSOCIATION_FILE" \
-  vk_hex.txt proof_hex.txt public_hex.txt "$WITHDRAWAL_FILE" \
+  "$VK_HEX_FILE" "$PROOF_HEX_FILE" "$PUBLIC_HEX_FILE" "$WITHDRAWAL_FILE" \
   circuits/witness.wtns circuits/proof.json circuits/public.json
 
 echo "Checking prerequisites..."
@@ -36,8 +43,8 @@ stellar contract optimize \
   --wasm-out target/wasm32v1-none/release/privacy_pools.optimized.wasm
 
 echo "Converting withdrawal verification key..."
-cargo run --bin stellar-circom2soroban vk circuits/output/main_verification_key.json > vk_hex.txt
-VK_HEX="$(grep -o '[0-9a-f]*$' vk_hex.txt)"
+cargo run --bin stellar-circom2soroban vk circuits/output/main_verification_key.json > "$VK_HEX_FILE"
+VK_HEX="$(grep -o '[0-9a-f]*$' "$VK_HEX_FILE")"
 if [ -z "$VK_HEX" ]; then
   echo "Error: failed to extract verification key hex."
   exit 1
@@ -108,15 +115,15 @@ echo "Creating withdrawal proof..."
 cargo run --bin stellar-coinutils withdraw "$COIN_FILE" "$STATE_FILE" "$ASSOCIATION_FILE" -o "$WITHDRAWAL_FILE"
 
 pushd circuits >/dev/null
-node build/main_js/generate_witness.js build/main_js/main.wasm "../$WITHDRAWAL_FILE" witness.wtns
-snarkjs groth16 prove output/main_final.zkey witness.wtns proof.json public.json
+node build/main_js/generate_witness.js build/main_js/main.wasm "../$WITHDRAWAL_FILE" "../$EVIDENCE_DIR/witness.wtns"
+snarkjs groth16 prove output/main_final.zkey "../$EVIDENCE_DIR/witness.wtns" "../$EVIDENCE_DIR/proof.json" "../$EVIDENCE_DIR/public.json"
 popd >/dev/null
 
 echo "Converting proof and public signals for Soroban..."
-cargo run --bin stellar-circom2soroban proof circuits/proof.json > proof_hex.txt
-cargo run --bin stellar-circom2soroban public circuits/public.json > public_hex.txt
-PROOF_HEX="$(sed -n '/^Proof Hex encoding:/{n;p;}' proof_hex.txt | tr -d '[:space:]' | sed -E 's/^0x//i')"
-PUBLIC_HEX="$(sed -n '/^Public signals Hex encoding:/{n;p;}' public_hex.txt | tr -d '[:space:]' | sed -E 's/^0x//i')"
+cargo run --bin stellar-circom2soroban proof "$EVIDENCE_DIR/proof.json" > "$PROOF_HEX_FILE"
+cargo run --bin stellar-circom2soroban public "$EVIDENCE_DIR/public.json" > "$PUBLIC_HEX_FILE"
+PROOF_HEX="$(sed -n '/^Proof Hex encoding:/{n;p;}' "$PROOF_HEX_FILE" | tr -d '[:space:]' | sed -E 's/^0x//i')"
+PUBLIC_HEX="$(sed -n '/^Public signals Hex encoding:/{n;p;}' "$PUBLIC_HEX_FILE" | tr -d '[:space:]' | sed -E 's/^0x//i')"
 if [ -z "$PROOF_HEX" ] || [ -z "$PUBLIC_HEX" ]; then
   echo "Error: failed to extract proof or public signals."
   exit 1
@@ -137,3 +144,4 @@ stellar contract invoke --id "$CONTRACT_ID" --source "$SOURCE" --network "$NETWO
 stellar contract invoke --id "$CONTRACT_ID" --source "$SOURCE" --network "$NETWORK" -- get_balance
 
 echo "Setu testnet flow completed successfully."
+echo "Evidence written to $EVIDENCE_DIR (gitignored; not part of the release package)."
